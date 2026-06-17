@@ -1,0 +1,78 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# ApplicationSet #2 — DEPLOYS THE WORKLOAD INSIDE EACH vCLUSTER
+# ───────────────────────────────────────────────────────────────────────────
+# Same git generator (tenants/<env>/<tenant>.yaml). Per tenant, creates an
+# Application that installs the `charts/tenant` chart (pg + 2 apps + quota +
+# limitrange + netpol + ingress) TARGETING the tenant's vCluster, not the host.
+#
+# The destination uses `name:` (not `server:`): the tenant cluster must be
+# registered in Argo. In OSS that is an Argo cluster Secret holding the vCluster
+# kubeconfig; with vCluster Platform it is the auto-managed Cluster + Secret
+# objects (official install/gitops docs).
+# ═══════════════════════════════════════════════════════════════════════════
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: tenant-workloads
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - git:
+        repoURL: https://github.com/villadalmine/vcluster-idp.git
+        revision: HEAD
+        files:
+          - path: "tenants/**/*.yaml"
+  template:
+    metadata:
+      name: "wl-{{.tenant.name}}-{{.tenant.environment}}"
+      labels:
+        platform.idp/tenant: "{{.tenant.name}}"
+        platform.idp/environment: "{{.tenant.environment}}"
+        platform.idp/layer: workload
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/villadalmine/vcluster-idp.git
+        targetRevision: HEAD
+        path: charts/tenant
+        helm:
+          # Override the chart values with the data from tenant.yaml.
+          valuesObject:
+            # Homelab: no ingress controller, but Cilium Gateway API is available,
+            # so apps are exposed via Gateway API (HTTPRoute) with TLS terminated by
+            # cert-manager at the Gateway. Portable chart default is "ingress" —
+            # flip this for a reviewer's vanilla cluster.
+            externalAccess:
+              mode: gateway
+            tenant:
+              name: "{{.tenant.name}}"
+              environment: "{{.tenant.environment}}"
+              domain: "{{.tenant.domain}}"
+            applications:
+              api:
+                version: "{{.applications.api.version}}"
+              web:
+                version: "{{.applications.web.version}}"
+      destination:
+        # name => the tenant's vCluster registered in Argo (NOT the host).
+        name: "vcluster-{{.tenant.name}}-{{.tenant.environment}}"
+        namespace: "{{.tenant.name}}"
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - RespectIgnoreDifferences=true   # official docs: required with CRDs/controllers
+          # Second failure-handling tag (ADR-08): lets the first sync not fail in
+          # dry-run when a resource in one wave depends on a CRD created by an
+          # earlier wave (e.g. custom resources inside the vCluster).
+          - SkipDryRunOnMissingResource=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 5m

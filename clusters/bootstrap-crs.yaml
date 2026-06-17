@@ -1,0 +1,54 @@
+# ═══ CAPI ClusterResourceSet — seed ArgoCD + platform-root on each new cluster ═══
+# CODE + ADR (does NOT run in the dev-single demo). Shows how the management cluster
+# bootstraps GitOps on every cluster CAPI creates WITHOUT a central ArgoCD: the CRS
+# applies these manifests ONCE to clusters matching the label, then each cluster's
+# own ArgoCD self-manages from Git (ADR-13). No hub-and-spoke.
+---
+apiVersion: addons.cluster.x-k8s.io/v1beta1
+kind: ClusterResourceSet
+metadata:
+  name: gitops-bootstrap
+  namespace: capi-prod
+spec:
+  clusterSelector:
+    matchLabels:
+      platform.idp/gitops: enabled   # CAPI Clusters with this label get seeded
+  strategy: ApplyOnce
+  resources:
+    - name: argocd-install            # sibling ConfigMap with the ArgoCD install manifests
+      kind: ConfigMap                 #   (generate from upstream argo-cd install.yaml)
+    - name: platform-root             # ConfigMap with the platform-root Application (below)
+      kind: ConfigMap
+---
+# ConfigMap carrying the platform-root Application (the app-of-apps root). Once the
+# new cluster's ArgoCD is up, this Application points it at the repo; from there the
+# cluster reconciles add-ons + ApplicationSets + tenants on its own.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: platform-root
+  namespace: capi-prod
+data:
+  platform-root.yaml: |
+    apiVersion: argoproj.io/v1alpha1
+    kind: Application
+    metadata:
+      name: platform-root
+      namespace: argocd
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/villadalmine/vcluster-idp.git
+        targetRevision: HEAD
+        path: platform/addons
+        directory:
+          recurse: true
+      destination:
+        server: https://kubernetes.default.svc   # the new cluster itself
+        namespace: argocd
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true

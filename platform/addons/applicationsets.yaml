@@ -1,0 +1,27 @@
+# Child app of platform-root: installs the tenant ApplicationSets into THIS
+# cluster's ArgoCD. They then provision vClusters and deploy tenant workloads
+# from tenants/<env>/*.yaml in Git.
+#
+# Multi-cluster note: in production each host cluster runs its own ArgoCD and would
+# scope the generator to its environment (e.g. path tenants/dev/** on the dev
+# cluster). For the dev-single demo the appsets read tenants/** (all envs).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: tenant-applicationsets
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/villadalmine/vcluster-idp.git
+    targetRevision: HEAD
+    path: applicationsets
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

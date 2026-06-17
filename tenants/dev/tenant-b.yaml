@@ -1,0 +1,10 @@
+# Second tenant: used to demonstrate network isolation (tenant-a -> tenant-b = DENIED).
+tenant:
+  name: tenant-b
+  environment: dev
+  domain: example.local
+applications:
+  api:
+    version: "0.10.2"
+  web:
+    version: "1.27-alpine"

@@ -1,0 +1,67 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# ApplicationSet #1 — PROVISIONS THE vCLUSTERS (tenant layer)
+# ───────────────────────────────────────────────────────────────────────────
+# Reads tenants/<env>/<tenant>.yaml via the git generator and, per tenant, creates
+# an Application that installs the `vcluster` chart (loft.sh) on the host cluster.
+# This materializes each tenant's virtual control plane (shared nodes, k3s).
+#
+# Result: the tenant exists as an isolated vCluster (own API server + etcd + CRDs)
+# BEFORE ApplicationSet #2 deploys the workload inside it.
+# ═══════════════════════════════════════════════════════════════════════════
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: tenant-vclusters
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    # Git generator: one entry per tenants/<env>/<tenant>.yaml file
+    - git:
+        repoURL: https://github.com/villadalmine/vcluster-idp.git
+        revision: HEAD
+        files:
+          - path: "tenants/**/*.yaml"
+  template:
+    metadata:
+      name: "vcluster-{{.tenant.name}}-{{.tenant.environment}}"
+      labels:
+        platform.idp/tenant: "{{.tenant.name}}"
+        platform.idp/environment: "{{.tenant.environment}}"
+        platform.idp/layer: vcluster
+    spec:
+      project: default
+      # Multi-source: the vcluster chart comes from loft.sh and the values from
+      # THIS repo (vcluster/shared-nodes.yaml) via the `$values` ref. This makes
+      # the rich shared-nodes config the GitOps source of truth, not an inline blob.
+      sources:
+        - repoURL: https://charts.loft.sh
+          chart: vcluster
+          targetRevision: "0.35.0"
+          helm:
+            valueFiles:
+              - $values/vcluster/shared-nodes.yaml
+        - repoURL: https://github.com/villadalmine/vcluster-idp.git
+          targetRevision: HEAD
+          ref: values
+      destination:
+        server: https://kubernetes.default.svc   # host cluster (CAPI layer in prod)
+        namespace: "vcluster-{{.tenant.name}}-{{.tenant.environment}}"
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true       # native drift detection (ADR-12)
+        syncOptions:
+          - CreateNamespace=true
+          # Required on the first sync: registering vClusters/Platform installs its
+          # own Cluster CRD, and without this the dry-run fails and the Application
+          # never syncs (ADR-08).
+          - SkipDryRunOnMissingResource=true
+        # ── Failure handling (ADR-08): retries with backoff ──
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 5m

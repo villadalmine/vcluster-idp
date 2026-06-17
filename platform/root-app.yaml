@@ -1,0 +1,36 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# platform-root — APP-OF-APPS (one per host cluster)
+# ───────────────────────────────────────────────────────────────────────────
+# DECENTRALIZED GITOPS: each host cluster runs its OWN ArgoCD. The management
+# cluster only runs CAPI; on cluster creation it SEEDS ArgoCD + THIS root app via a
+# CAPI ClusterResourceSet (one-shot, see clusters/bootstrap-crs.yaml). After the
+# seed, the cluster's ArgoCD reconciles everything below from Git on its own — there
+# is NO central ArgoCD and the management cluster does NOT deploy tenants.
+#
+# This root syncs platform/addons/, which in turn brings up the platform services
+# and the tenant ApplicationSets (which provision vClusters and deploy workloads).
+# ═══════════════════════════════════════════════════════════════════════════
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: platform-root
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/villadalmine/vcluster-idp.git
+    targetRevision: HEAD
+    path: platform/addons
+    directory:
+      recurse: true        # treat every manifest under addons/ as a child app
+  destination:
+    server: https://kubernetes.default.svc   # the LOCAL host cluster (its own ArgoCD)
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

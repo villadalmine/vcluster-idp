@@ -1,0 +1,10 @@
+# Dedicated tenant namespace (inside its vCluster).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ include "tenant.name" . }}
+  annotations:
+    # Wave 0: the namespace is created first; everything else depends on it.
+    argocd.argoproj.io/sync-wave: "0"
+  labels:
+    {{- include "tenant.labels" . | nindent 4 }}

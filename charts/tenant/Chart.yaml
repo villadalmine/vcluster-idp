@@ -1,0 +1,11 @@
+apiVersion: v2
+name: tenant
+description: |
+  Platform chart that materializes a tenant's workload INSIDE its vCluster:
+  namespace, ResourceQuota, LimitRange, default-deny NetworkPolicy, auto-generated
+  PostgreSQL Secret, PostgreSQL, customer-api (httpbin), customer-web (nginx) and Ingress.
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+maintainers:
+  - name: IDP Platform

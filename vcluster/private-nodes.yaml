@@ -1,0 +1,31 @@
+# ═══ vcluster.yaml — PRIVATE NODES (production step, DOES NOT RUN in demo) ════
+# REAL dedicated worker nodes per tenant. Infrastructure-level isolation:
+# the GPU / regulated / paying-customer case (official vCluster docs).
+#
+# WHY NOT IN THE DEMO (ADR section 4): it requires a LoadBalancer + Konnectivity +
+# real nodes that an ephemeral kind/k3d doesn't have, and it DISABLES sync.*,
+# integrations.*, replicateServices, sleep, forces the virtual scheduler, and only
+# supports vanilla k8s (k3s NOT available). It's a different operating model, not
+# just another flag. Must be enabled from the initial install (no migration from
+# shared nodes).
+privateNodes:
+  enabled: true
+controlPlane:
+  distro:
+    k8s:                          # private nodes => ONLY vanilla k8s (no k3s)
+      image:
+        tag: v1.31.2
+  service:
+    spec:
+      type: LoadBalancer          # required so the nodes can join
+networking:
+  podCIDR: 10.64.0.0/16
+  serviceCIDR: 10.128.0.0/16
+policies:
+  networkPolicy:
+    enabled: true
+    controlPlane:
+      ingress:
+        - from:
+            - ipBlock:
+                cidr: 0.0.0.0/0   # in prod: the LoadBalancer internal CIDR, not 0.0.0.0/0

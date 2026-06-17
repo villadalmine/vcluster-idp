@@ -1,0 +1,47 @@
+# --- customer-web (requirement 3): web app = nginx --------------------------
+# Version selectable via image tag (.Values.applications.web.version).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "tenant.name" . }}-customer-web
+  namespace: {{ include "tenant.name" . }}
+  annotations:
+    # Wave 4: together with customer-api, once the base is Healthy.
+    argocd.argoproj.io/sync-wave: "4"
+  labels:
+    {{- include "tenant.labels" . | nindent 4 }}
+    app.kubernetes.io/name: customer-web
+    app.kubernetes.io/version: {{ .Values.applications.web.version | quote }}
+spec:
+  replicas: {{ .Values.applications.web.replicas }}
+  selector:
+    matchLabels:
+      {{- include "tenant.appSelector" (dict "root" . "appName" "customer-web") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "tenant.labels" . | nindent 8 }}
+        app.kubernetes.io/name: customer-web
+    spec:
+      {{- include "tenant.placement" . | nindent 6 }}
+      containers:
+        - name: customer-web
+          image: "{{ .Values.applications.web.image }}:{{ .Values.applications.web.version }}"
+          ports:
+            - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "tenant.name" . }}-customer-web
+  namespace: {{ include "tenant.name" . }}
+  labels:
+    {{- include "tenant.labels" . | nindent 4 }}
+    app.kubernetes.io/name: customer-web
+spec:
+  # ClusterIP: external access is fronted by the Ingress/Gateway (L7), never the Service.
+  selector:
+    {{- include "tenant.appSelector" (dict "root" . "appName" "customer-web") | nindent 4 }}
+  ports:
+    - port: 80
+      targetPort: 80

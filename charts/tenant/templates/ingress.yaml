@@ -1,0 +1,50 @@
+{{- if eq .Values.externalAccess.mode "ingress" }}
+# --- External access (requirement 12): Ingress mode ------------------------
+# Per-tenant hosts: api.<tenant>.<domain> and web.<tenant>.<domain>.
+# TLS (when enabled) is issued by cert-manager (ingress-shim) from the ClusterIssuer.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "tenant.name" . }}-ingress
+  namespace: {{ include "tenant.name" . }}
+  annotations:
+    # Wave 4: exposes the apps once deployed.
+    argocd.argoproj.io/sync-wave: "4"
+    {{- if .Values.externalAccess.tls.enabled }}
+    cert-manager.io/cluster-issuer: {{ .Values.externalAccess.tls.clusterIssuer }}
+    {{- end }}
+  labels:
+    {{- include "tenant.labels" . | nindent 4 }}
+spec:
+  {{- if .Values.externalAccess.ingress.className }}
+  ingressClassName: {{ .Values.externalAccess.ingress.className }}
+  {{- end }}
+  {{- if .Values.externalAccess.tls.enabled }}
+  tls:
+    - hosts:
+        - "api.{{ include "tenant.name" . }}.{{ .Values.tenant.domain }}"
+        - "web.{{ include "tenant.name" . }}.{{ .Values.tenant.domain }}"
+      secretName: {{ include "tenant.name" . }}-tls
+  {{- end }}
+  rules:
+    - host: "api.{{ include "tenant.name" . }}.{{ .Values.tenant.domain }}"
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "tenant.name" . }}-customer-api
+                port:
+                  number: 80
+    - host: "web.{{ include "tenant.name" . }}.{{ .Values.tenant.domain }}"
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "tenant.name" . }}-customer-web
+                port:
+                  number: 80
+{{- end }}

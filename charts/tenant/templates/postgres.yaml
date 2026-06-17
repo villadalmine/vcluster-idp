@@ -1,0 +1,85 @@
+# --- Dedicated PostgreSQL per tenant (requirement 3) ------------------------
+# StatefulSet with its own PVC. Credentials taken from the auto-generated Secret.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "tenant.name" . }}-postgres
+  namespace: {{ include "tenant.name" . }}
+  annotations:
+    # Wave 3: Postgres after the secret; Argo waits for it to be Healthy
+    # before advancing to the apps (wave 4). Don't build on something broken.
+    argocd.argoproj.io/sync-wave: "3"
+  labels:
+    {{- include "tenant.labels" . | nindent 4 }}
+    app.kubernetes.io/name: postgres
+spec:
+  serviceName: {{ include "tenant.name" . }}-postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "tenant.appSelector" (dict "root" . "appName" "postgres") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "tenant.labels" . | nindent 8 }}
+        app.kubernetes.io/name: postgres
+    spec:
+      {{- include "tenant.placement" . | nindent 6 }}
+      containers:
+        - name: postgres
+          image: {{ .Values.postgres.image }}
+          ports:
+            - containerPort: 5432
+              name: postgres
+          env:
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "tenant.name" . }}-postgres
+                  key: database
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "tenant.name" . }}-postgres
+                  key: username
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "tenant.name" . }}-postgres
+                  key: password
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "{{ .Values.postgres.username }}"]
+            initialDelaySeconds: 10
+            periodSeconds: 5
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        {{- if .Values.postgres.storageClassName }}
+        storageClassName: {{ .Values.postgres.storageClassName }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.postgres.storage }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "tenant.name" . }}-postgres
+  namespace: {{ include "tenant.name" . }}
+  labels:
+    {{- include "tenant.labels" . | nindent 4 }}
+    app.kubernetes.io/name: postgres
+spec:
+  selector:
+    {{- include "tenant.appSelector" (dict "root" . "appName" "postgres") | nindent 4 }}
+  ports:
+    - port: 5432
+      targetPort: 5432

@@ -1,0 +1,71 @@
+# ═══ LAYER 1 — CAPI: HOST CLUSTER provisioning (CODE + ADR, DOES NOT RUN) ════
+# Declaratively defines an RKE2 host cluster. In the demo the host is provided by
+# kind/k3d; this shows HOW the fleet is provisioned in production (ADR-04/05).
+#
+# RKE2 chosen for CIS + FIPS hardening — key for sovereignty/regulated (Nebul).
+# Example provider: Docker (CAPD) for local reproducibility; in prod it would be
+# a real infra provider (vSphere, Metal3, cloud).
+---
+apiVersion: cluster.x-k8s.io/v1beta1
+kind: Cluster
+metadata:
+  name: host-prod-eu-west
+  namespace: capi-prod
+  labels:
+    platform.idp/environment: prod
+    platform.idp/region: eu-west
+spec:
+  clusterNetwork:
+    pods:
+      cidrBlocks: ["192.168.0.0/16"]
+    services:
+      cidrBlocks: ["10.128.0.0/12"]
+  controlPlaneRef:
+    apiVersion: controlplane.cluster.x-k8s.io/v1beta1
+    kind: RKE2ControlPlane
+    name: host-prod-eu-west-cp
+  infrastructureRef:
+    apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+    kind: DockerCluster
+    name: host-prod-eu-west
+---
+apiVersion: controlplane.cluster.x-k8s.io/v1beta1
+kind: RKE2ControlPlane
+metadata:
+  name: host-prod-eu-west-cp
+  namespace: capi-prod
+spec:
+  replicas: 3                      # HA: multi-node control plane (etcd quorum) — ADR-11
+  version: v1.31.2+rke2r1
+  serverConfig:
+    cni: cilium                    # Cilium for NetworkPolicy (ADR-06)
+    profile: cis                   # CIS hardening (ADR-05)
+  machineTemplate:
+    infrastructureRef:
+      apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+      kind: DockerMachineTemplate
+      name: host-prod-eu-west-cp
+---
+apiVersion: cluster.x-k8s.io/v1beta1
+kind: MachineDeployment
+metadata:
+  name: host-prod-eu-west-md
+  namespace: capi-prod
+spec:
+  clusterName: host-prod-eu-west
+  replicas: 3                      # host worker nodes (where the vClusters live)
+  selector:
+    matchLabels: {}
+  template:
+    spec:
+      clusterName: host-prod-eu-west
+      version: v1.31.2+rke2r1
+      bootstrap:
+        configRef:
+          apiVersion: bootstrap.cluster.x-k8s.io/v1beta1
+          kind: RKE2ConfigTemplate
+          name: host-prod-eu-west-md
+      infrastructureRef:
+        apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+        kind: DockerMachineTemplate
+        name: host-prod-eu-west-md

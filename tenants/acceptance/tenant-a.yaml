@@ -1,0 +1,10 @@
+# Same tenant promoted to acceptance, with potentially different versions.
+tenant:
+  name: tenant-a
+  environment: acceptance
+  domain: acc.example.local
+applications:
+  api:
+    version: "0.10.2"
+  web:
+    version: "1.27-alpine"

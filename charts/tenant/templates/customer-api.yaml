@@ -1,0 +1,54 @@
+# --- customer-api (requirement 3): demo API = httpbin -----------------------
+# Version selectable via image tag (.Values.applications.api.version).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "tenant.name" . }}-customer-api
+  namespace: {{ include "tenant.name" . }}
+  annotations:
+    # Wave 4: the app deploys only once Postgres (wave 3) is Healthy.
+    argocd.argoproj.io/sync-wave: "4"
+  labels:
+    {{- include "tenant.labels" . | nindent 4 }}
+    app.kubernetes.io/name: customer-api
+    app.kubernetes.io/version: {{ .Values.applications.api.version | quote }}
+spec:
+  replicas: {{ .Values.applications.api.replicas }}
+  selector:
+    matchLabels:
+      {{- include "tenant.appSelector" (dict "root" . "appName" "customer-api") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "tenant.labels" . | nindent 8 }}
+        app.kubernetes.io/name: customer-api
+    spec:
+      {{- include "tenant.placement" . | nindent 6 }}
+      containers:
+        - name: customer-api
+          image: "{{ .Values.applications.api.image }}:{{ .Values.applications.api.version }}"
+          ports:
+            - containerPort: 8080
+          # The app reads the Postgres DSN from the auto-generated Secret.
+          env:
+            - name: DATABASE_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "tenant.name" . }}-postgres
+                  key: dsn
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "tenant.name" . }}-customer-api
+  namespace: {{ include "tenant.name" . }}
+  labels:
+    {{- include "tenant.labels" . | nindent 4 }}
+    app.kubernetes.io/name: customer-api
+spec:
+  # ClusterIP: external access is fronted by the Ingress/Gateway (L7), never the Service.
+  selector:
+    {{- include "tenant.appSelector" (dict "root" . "appName" "customer-api") | nindent 4 }}
+  ports:
+    - port: 80
+      targetPort: 8080

@@ -1,0 +1,18 @@
+# Resource governance (requirement 6): tenant-wide aggregate quota.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: {{ include "tenant.name" . }}-quota
+  namespace: {{ include "tenant.name" . }}
+  annotations:
+    # Wave 1: resource governance before deploying workloads.
+    argocd.argoproj.io/sync-wave: "1"
+  labels:
+    {{- include "tenant.labels" . | nindent 4 }}
+spec:
+  hard:
+    requests.cpu: {{ .Values.resourceQuota.requestsCpu | quote }}
+    requests.memory: {{ .Values.resourceQuota.requestsMemory }}
+    limits.cpu: {{ .Values.resourceQuota.limitsCpu | quote }}
+    limits.memory: {{ .Values.resourceQuota.limitsMemory }}
+    pods: {{ .Values.resourceQuota.pods | quote }}

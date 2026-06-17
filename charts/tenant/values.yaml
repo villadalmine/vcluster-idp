@@ -1,0 +1,72 @@
+# -----------------------------------------------------------------------------
+# values.yaml — a single tenant's workload. The tenants ApplicationSet overrides
+# `tenant.name` and the versions per entry in tenants/<env>/<tenant>.yaml.
+# -----------------------------------------------------------------------------
+tenant:
+  name: tenant-a            # tenant name (= namespace inside the vCluster)
+  environment: dev          # dev | acceptance | prod
+  domain: example.local     # base for Ingress hosts
+
+# Version management (PDF requirement 5): version = image tag per app.
+applications:
+  api:
+    version: "latest"       # e.g. "0.10.2" — mccutchen/go-httpbin tag
+    image: mccutchen/go-httpbin
+    replicas: 1
+  web:
+    version: "1.27-alpine"  # nginx tag
+    image: nginx
+    replicas: 1
+
+# Resource governance (PDF requirement 6).
+resourceQuota:
+  requestsCpu: "2"
+  requestsMemory: 4Gi
+  limitsCpu: "4"
+  limitsMemory: 8Gi
+  pods: "20"
+
+# Per-container defaults (LimitRange).
+limitRange:
+  defaultRequestCpu: 100m
+  defaultRequestMemory: 128Mi
+  defaultLimitCpu: 500m
+  defaultLimitMemory: 512Mi
+
+postgres:
+  image: postgres:16-alpine
+  database: app
+  username: app
+  # password: NOT set here. Auto-generated in templates/secret.yaml (randAlphaNum).
+  storage: 1Gi
+  storageClassName: ""      # empty = cluster default StorageClass
+
+# External access (requirement 12). `mode` selects how the apps are exposed.
+#   ingress → classic Ingress (needs an ingress controller). Portable default.
+#   gateway → Gateway API (HTTPRoute) served by a host Gateway controller. Modern,
+#             works through vCluster sync.toHost.gatewayApi (Cilium on this homelab).
+# TLS terminates at L7 (Ingress or Gateway) via cert-manager — never on a raw L4 LB.
+externalAccess:
+  mode: ingress
+  tls:
+    enabled: true
+    clusterIssuer: cluster-home-ca-issuer   # cert-manager ClusterIssuer (CA-backed)
+  ingress:
+    className: ""           # e.g. "nginx"; empty = default IngressClass
+    # NetworkPolicy allows inbound from this ingress-controller namespace.
+    controllerNamespaceLabel: kubernetes.io/metadata.name
+    controllerNamespaceValue: ingress-nginx
+  gateway:
+    className: cilium        # GatewayClass imported from host (sync.fromHost.gatewayClasses)
+    sourceCIDR: "0.0.0.0/0"  # NetworkPolicy north-south allow to the app ports
+
+networkPolicy:
+  enabled: true
+
+# Placement: pin tenant workloads to specific node(s).
+# TEST: pinned to the GPU node (srv-t7910: 32 cores / 256GB / 2 GPUs, 16GB VRAM).
+# For the portable deliverable, set nodeSelector to {} so the scheduler is free.
+placement:
+  nodeSelector:
+    kubernetes.io/hostname: srv-t7910
+  tolerations: []

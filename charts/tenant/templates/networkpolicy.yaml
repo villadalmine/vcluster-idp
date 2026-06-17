@@ -1,0 +1,91 @@
+{{- if .Values.networkPolicy.enabled }}
+# --- Network isolation (requirement 7) --------------------------------------
+# Layer 2 on top of the control-plane isolation vCluster already provides.
+# default-deny pattern: deny ALL ingress, then explicitly allow
+# (intra-namespace + the chosen external-access path).
+# Result: tenant-a -> tenant-b = DENIED (east-west stays denied in every mode).
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: {{ include "tenant.name" . }}
+  annotations:
+    # Wave 1: isolation exists before any workload is deployed.
+    argocd.argoproj.io/sync-wave: "1"
+  labels:
+    {{- include "tenant.labels" . | nindent 4 }}
+spec:
+  podSelector: {}            # applies to all pods in the namespace
+  policyTypes:
+    - Ingress
+  # no 'ingress:' rules => denies all inbound traffic
+---
+# Allow traffic ONLY between pods of the same tenant (same namespace).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-same-namespace
+  namespace: {{ include "tenant.name" . }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+  labels:
+    {{- include "tenant.labels" . | nindent 4 }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector: {}    # any pod in the SAME namespace
+{{- if eq .Values.externalAccess.mode "ingress" }}
+---
+# Ingress mode: allow inbound from the ingress controller namespace.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-controller
+  namespace: {{ include "tenant.name" . }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+  labels:
+    {{- include "tenant.labels" . | nindent 4 }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              {{ .Values.externalAccess.ingress.controllerNamespaceLabel }}: {{ .Values.externalAccess.ingress.controllerNamespaceValue }}
+{{- else if eq .Values.externalAccess.mode "gateway" }}
+---
+# Gateway mode: allow north-south inbound to the app pods only (api/web), coming
+# from the Gateway data plane. Postgres is never exposed; east-west isolation holds.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-external-gateway
+  namespace: {{ include "tenant.name" . }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+  labels:
+    {{- include "tenant.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/name
+        operator: In
+        values: ["customer-api", "customer-web"]
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - ipBlock:
+            cidr: {{ .Values.externalAccess.gateway.sourceCIDR | quote }}
+      ports:
+        - port: 8080
+        - port: 80
+{{- end }}
+{{- end }}
