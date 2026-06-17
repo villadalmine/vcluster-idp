@@ -6,6 +6,6 @@ tenant:
   domain: eu-west.example.com
 applications:
   api:
-    version: "0.10.1"     # prod can lag one version behind (controlled release)
+    version: "2.23.0"     # prod can lag one version behind (controlled release)
   web:
     version: "1.26-alpine"
