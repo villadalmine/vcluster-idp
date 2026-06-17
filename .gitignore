@@ -1,0 +1,12 @@
+# Estado local / artefactos
+*.kubeconfig
+kubeconfig-*
+.DS_Store
+charts/tenant/charts/
+charts/tenant/Chart.lock
+*.tgz
+
+# Docs en markdown: por ahora NO se publican (se decide cuáles más adelante).
+# Para incluir uno puntual: git add -f <archivo>.md  (o sacar esta regla).
+*.md
+
