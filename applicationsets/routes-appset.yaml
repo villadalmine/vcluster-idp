@@ -1,0 +1,58 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# ApplicationSet #3 — TENANT EXTERNAL ACCESS, host-side (Gateway API persona split)
+# ───────────────────────────────────────────────────────────────────────────
+# Per tenant.yaml, deploys charts/tenant-route ON THE HOST (NOT into the vCluster),
+# in the namespace where the vCluster-synced Services live (vcluster-<tenant>-<env>).
+# The tenant owns its Gateway + HTTPRoutes (agnostic, self-service); they route to
+# the synced Services. This sidesteps vCluster Gateway API sync (which doesn't reach
+# the host) and uses Service sync (which does). See ADR-06.
+# ═══════════════════════════════════════════════════════════════════════════
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: tenant-routes
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - git:
+        repoURL: https://github.com/villadalmine/vcluster-idp.git
+        revision: HEAD
+        files:
+          - path: "tenants/**/*.yaml"
+  template:
+    metadata:
+      name: "route-{{.tenant.name}}-{{.tenant.environment}}"
+      labels:
+        platform.idp/tenant: "{{.tenant.name}}"
+        platform.idp/environment: "{{.tenant.environment}}"
+        platform.idp/layer: route
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/villadalmine/vcluster-idp.git
+        targetRevision: HEAD
+        path: charts/tenant-route
+        helm:
+          valuesObject:
+            tenant:
+              name: "{{.tenant.name}}"
+              environment: "{{.tenant.environment}}"
+              domain: "{{.tenant.domain}}"
+      destination:
+        # HOST cluster (NOT the vCluster), in the synced-Services namespace.
+        server: https://kubernetes.default.svc
+        namespace: "vcluster-{{.tenant.name}}-{{.tenant.environment}}"
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 5m

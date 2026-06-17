@@ -1,0 +1,19 @@
+# -----------------------------------------------------------------------------
+# tenant-route — host-side external access for ONE tenant (Gateway API).
+# Deployed to the host namespace where the vCluster-synced Services live
+# (vcluster-<tenant>-<env>). The tenants-routes ApplicationSet overrides `tenant`.
+# -----------------------------------------------------------------------------
+tenant:
+  name: tenant-a
+  environment: dev
+  domain: example.local
+
+gateway:
+  className: cilium       # agnostic: any Gateway API impl works (cilium here)
+
+# TLS terminates at the Gateway via cert-manager (gateway-shim). Default OFF so the
+# demo works immediately over HTTP; set true once cert-manager gateway-shim is enabled
+# on the cluster (see infra-ai). Then certs are issued per tenant host.
+tls:
+  enabled: false
+  clusterIssuer: cluster-home-ca-issuer

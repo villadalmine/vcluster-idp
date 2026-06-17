@@ -1,0 +1,12 @@
+apiVersion: v2
+name: tenant-route
+description: |
+  Per-tenant external access, materialized ON THE HOST (Gateway API persona split):
+  the tenant OWNS a Gateway + HTTPRoutes (agnostic GatewayClass), self-service via
+  GitOps. Routes target the vCluster-synced Services on the host. No shared platform
+  Gateway and no in-vCluster routing (vCluster does not sync Gateway API to host).
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+maintainers:
+  - name: IDP Platform
