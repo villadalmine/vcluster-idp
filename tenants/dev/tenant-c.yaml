@@ -1,0 +1,9 @@
+tenant:
+  name: tenant-c
+  environment: dev
+  domain: example.local
+applications:
+  api:
+    version: "2.23.1"
+  web:
+    version: "1.27-alpine"
