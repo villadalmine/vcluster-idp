@@ -13,10 +13,16 @@ metadata:
   labels:
     {{- include "route.labels" . | nindent 4 }}
 spec:
-  endpointSelector: {}
+  # SOLO los pods del WORKLOAD del tenant — NO los del control-plane del vCluster
+  # (vcluster-<t>-0, coredns) que viven en el mismo namespace del host. Si seleccionás
+  # todo ({}), el default-deny bloquea el acceso de ArgoCD/plataforma al API del vCluster
+  # (i/o timeout → cache stale → no sync). Lección de shared-nodes.
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: idp-platform
   ingress:
     - fromEndpoints:
-        - {}
+        - {}              # same namespace (intra-tenant + control plane local)
     - fromEntities:
-        - ingress
+        - ingress         # Cilium Gateway/Ingress L7 proxy (north-south)
 {{- end }}
