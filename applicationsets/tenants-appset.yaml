@@ -59,6 +59,14 @@ spec:
         # name => the tenant's vCluster registered in Argo (NOT the host).
         name: "vcluster-{{.tenant.name}}-{{.tenant.environment}}"
         namespace: "{{.tenant.name}}"
+      # The Postgres Secret uses Helm `lookup` to keep the password stable, but under
+      # ArgoCD `lookup` returns empty during diff → false drift (ADR-07). Ignore the
+      # Secret data so Argo neither flags it OutOfSync nor overwrites the live password
+      # (with RespectIgnoreDifferences=true the live data is preserved).
+      ignoreDifferences:
+        - kind: Secret
+          jsonPointers:
+            - /data
       syncPolicy:
         automated:
           prune: true
