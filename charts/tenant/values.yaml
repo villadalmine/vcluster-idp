@@ -37,9 +37,17 @@ postgres:
   image: postgres:16-alpine
   database: app
   username: app
-  # password: NOT set here. Auto-generated in templates/secret.yaml (randAlphaNum).
+  # password: NOT set here. See secretBackend below.
   storage: 1Gi
   storageClassName: ""      # empty = cluster default StorageClass
+  # Secret backend (req 8):
+  #   generated → in-chart Kubernetes Secret (randAlphaNum + lookup). Portable, no deps.
+  #   eso       → External Secrets Operator: a per-namespace Password generator
+  #               (no external backend; password generated in-cluster, never in Git).
+  #               Requires ESO installed INSIDE the vCluster (see applicationsets/eso-appset.yaml).
+  secretBackend: generated
+  eso:
+    passwordLength: 24
 
 # External access (requirement 12). `mode` selects how the apps are exposed.
 #   ingress → classic Ingress (needs an ingress controller). Portable default.

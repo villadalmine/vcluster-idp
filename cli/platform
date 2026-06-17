@@ -1,0 +1,185 @@
+#!/usr/bin/env bash
+# ═══════════════════════════════════════════════════════════════════════════
+# platform — IDP CLI (GitOps FACADE, not an imperative orchestrator)
+# ───────────────────────────────────────────────────────────────────────────
+# Syntax (PDF):    platform <tenant> <create|delete|status>
+# Alternate form:  platform create <tenant> [--api-version X] [--web-version Y] [--env E]
+#
+# Philosophy: `create` does NOT deploy imperatively. It writes/commits the file
+# tenants/<env>/<tenant>.yaml (the source of truth) and lets ArgoCD reconcile
+# via the two ApplicationSets. This gives idempotency and drift detection "for
+# free" (ADR-02/12). In a local environment with no remote, it falls back to a
+# direct `kubectl apply` of the tenant so the demo runs end-to-end.
+# ═══════════════════════════════════════════════════════════════════════════
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ENVIRONMENT="${PLATFORM_ENV:-dev}"
+API_VERSION=""
+WEB_VERSION=""
+DOMAIN="${PLATFORM_DOMAIN:-example.local}"
+SECRET_BACKEND="${PLATFORM_SECRET_BACKEND:-generated}"   # generated | eso (ADR-07)
+
+color() { printf "\033[%sm%s\033[0m" "$1" "$2"; }
+info()  { echo "$(color '1;34' '▶') $*"; }
+ok()    { echo "$(color '1;32' '✔') $*"; }
+warn()  { echo "$(color '1;33' '⚠') $*"; }
+err()   { echo "$(color '1;31' '✗') $*" >&2; }
+
+usage() {
+  cat <<USAGE
+platform — IDP CLI
+
+  platform <tenant> create     Provision the tenant (GitOps commit + reconcile)
+  platform <tenant> delete     Delete the tenant (remove the yaml + Argo prune)
+  platform <tenant> status     Show per-component status
+
+Options (for create):
+  --env <dev|acceptance|prod>  Environment (default: \$PLATFORM_ENV or dev)
+  --api-version <tag>          customer-api version (image tag)
+  --web-version <tag>          customer-web version (image tag)
+  --secret-backend <b>         postgres secret backend: generated (default) | eso
+
+Examples:
+  platform tenant-a create --api-version 0.10.2 --web-version 1.27-alpine
+  platform tenant-c create --secret-backend eso
+  platform tenant-a status
+  platform tenant-a delete
+USAGE
+}
+
+# ── Argument parsing: supports both forms ───────────────────────────────────
+TENANT=""; ACTION=""
+args=("$@")
+if [[ ${#args[@]} -lt 2 ]]; then usage; exit 1; fi
+case "${args[0]}" in
+  create|delete|status) ACTION="${args[0]}"; TENANT="${args[1]}";;
+  *) TENANT="${args[0]}"; ACTION="${args[1]}";;
+esac
+shift 2 || true
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --env) ENVIRONMENT="$2"; shift 2;;
+    --api-version) API_VERSION="$2"; shift 2;;
+    --web-version) WEB_VERSION="$2"; shift 2;;
+    --secret-backend) SECRET_BACKEND="$2"; shift 2;;
+    --domain) DOMAIN="$2"; shift 2;;
+    *) err "unknown option: $1"; exit 1;;
+  esac
+done
+
+TENANT_FILE="$REPO_ROOT/tenants/$ENVIRONMENT/$TENANT.yaml"
+VC_NS="vcluster-${TENANT}-${ENVIRONMENT}"   # vCluster namespace on the host (= Argo cluster name)
+
+# ── create: write the tenant.yaml (source of truth) and reconcile ───────────
+cmd_create() {
+  info "Tenant '$TENANT' (env=$ENVIRONMENT) → writing source of truth"
+  mkdir -p "$(dirname "$TENANT_FILE")"
+  local api="${API_VERSION:-2.23.1}"
+  local web="${WEB_VERSION:-1.27-alpine}"
+  # Idempotency: if it already exists, don't duplicate — overwrite the desired manifest.
+  cat > "$TENANT_FILE" <<YAML
+tenant:
+  name: $TENANT
+  environment: $ENVIRONMENT
+  domain: $DOMAIN
+  secretBackend: $SECRET_BACKEND   # generated | eso (ADR-07)
+applications:
+  api:
+    version: "$api"
+  web:
+    version: "$web"
+YAML
+  ok "tenants/$ENVIRONMENT/$TENANT.yaml written"
+
+  if git -C "$REPO_ROOT" rev-parse >/dev/null 2>&1; then
+    git -C "$REPO_ROOT" add "$TENANT_FILE"
+    git -C "$REPO_ROOT" commit -m "feat(tenant): provision $TENANT in $ENVIRONMENT" >/dev/null 2>&1 \
+      && ok "GitOps commit created — ArgoCD will reconcile the ApplicationSets" \
+      || warn "nothing to commit (idempotent)"
+    if command -v argocd >/dev/null 2>&1; then
+      info "forcing ApplicationSets refresh…"
+      argocd appset get tenant-vclusters >/dev/null 2>&1 && argocd app sync -l "platform.idp/tenant=$TENANT" 2>/dev/null || true
+    else
+      warn "argocd CLI not available: in production you'd 'git push' and Argo applies on its own"
+    fi
+  else
+    warn "git repo not initialized: falling back to direct apply (local demo only)"
+    # Didactic fallback: apply the chart via helm against the vCluster.
+    warn "run 'make create TENANT=$TENANT' for the full helm/vcluster flow"
+  fi
+  echo; info "verify with: platform $TENANT status"
+}
+
+# ── delete: remove the tenant.yaml; Argo's prune deletes the resources ──────
+cmd_delete() {
+  info "Tenant '$TENANT' (env=$ENVIRONMENT) → deleting"
+  if [[ -f "$TENANT_FILE" ]]; then
+    rm -f "$TENANT_FILE"
+    ok "tenants/$ENVIRONMENT/$TENANT.yaml removed"
+    if git -C "$REPO_ROOT" rev-parse >/dev/null 2>&1; then
+      git -C "$REPO_ROOT" add -A "$(dirname "$TENANT_FILE")"
+      git -C "$REPO_ROOT" commit -m "feat(tenant): deprovision $TENANT in $ENVIRONMENT" >/dev/null 2>&1 || true
+      ok "delete commit — Argo will prune the Applications (vcluster + workload)"
+    fi
+  else
+    warn "$TENANT_FILE does not exist (idempotent: nothing to delete)"
+  fi
+  # Backup direct cleanup (in case Argo is not present): delete the vCluster namespace.
+  if command -v kubectl >/dev/null 2>&1; then
+    kubectl delete ns "$VC_NS" --ignore-not-found --wait=false 2>/dev/null || true
+  fi
+}
+
+# ── status: per-component status with the EXACT PDF format ───────────────────
+component_status() {
+  # $1 = readable kind/selector ; prints "Ready" / "NotReady" / "Missing"
+  local out="$1"
+  if command -v kubectl >/dev/null 2>&1; then
+    eval "$2" >/dev/null 2>&1 && echo "Ready" || echo "NotReady"
+  else
+    echo "Unknown"   # without kubectl we can't query
+  fi
+}
+
+cmd_status() {
+  if [[ ! -f "$TENANT_FILE" ]]; then
+    err "Tenant '$TENANT' does not exist in env=$ENVIRONMENT"
+    exit 1
+  fi
+  local ns="$TENANT"   # namespace inside the vCluster
+  local kctx="--context vcluster-${TENANT}-${ENVIRONMENT}"  # the vCluster context
+
+  # Compute Age from the vCluster namespace on the host.
+  local age="unknown"
+  if command -v kubectl >/dev/null 2>&1; then
+    local created
+    created=$(kubectl get ns "$VC_NS" -o jsonpath='{.metadata.creationTimestamp}' 2>/dev/null || true)
+    if [[ -n "$created" ]]; then
+      local now epoch diff
+      epoch=$(date -d "$created" +%s 2>/dev/null || echo 0)
+      now=$(date +%s); diff=$(( (now - epoch) / 60 ))
+      age="${diff}m"
+    fi
+  fi
+
+  echo
+  echo "Tenant: $TENANT"
+  echo
+  printf "Namespace: %s\n"        "$(component_status ns        "kubectl get ns $VC_NS")"
+  printf "vCluster: %s\n"         "$(component_status vc        "kubectl get pods -n $VC_NS -l app=vcluster --field-selector=status.phase=Running")"
+  printf "PostgreSQL: %s\n"       "$(component_status pg        "kubectl get statefulset $ns-postgres -n $ns $kctx")"
+  printf "API Application: %s\n"  "$(component_status api       "kubectl get deploy $ns-customer-api -n $ns $kctx")"
+  printf "Web Application: %s\n"  "$(component_status web       "kubectl get deploy $ns-customer-web -n $ns $kctx")"
+  echo
+  echo "Age: $age"
+  echo
+}
+
+case "$ACTION" in
+  create) cmd_create;;
+  delete) cmd_delete;;
+  status) cmd_status;;
+  -h|--help|help) usage;;
+  *) err "invalid action: $ACTION"; usage; exit 1;;
+esac

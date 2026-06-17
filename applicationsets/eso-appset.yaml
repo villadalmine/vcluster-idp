@@ -1,0 +1,71 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# ApplicationSet #4 (OPT-IN) — INSTALLS EXTERNAL SECRETS OPERATOR INSIDE EACH vCLUSTER
+# ───────────────────────────────────────────────────────────────────────────
+# Enables the `eso` secret backend (charts/tenant → secretBackend: eso). ESO must
+# run WHERE the Secret is consumed — i.e. inside the vCluster, next to Postgres —
+# so this targets the tenant's vCluster (destination name:), not the host.
+#
+# The Postgres password is produced by an in-cluster `Password` generator
+# (no external backend), so each tenant's secret material stays inside its own
+# vCluster. The generator + ExternalSecret are namespaced per tenant → multi-tenant.
+#
+# OPT-IN: this appset is NOT in platform/addons by default. Apply it only when you
+# flip a tenant to `secretBackend: eso`. Chart default stays `generated` (portable).
+#   kubectl apply -f applicationsets/eso-appset.yaml
+# ═══════════════════════════════════════════════════════════════════════════
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: tenant-eso
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - git:
+        repoURL: https://github.com/villadalmine/vcluster-idp.git
+        revision: HEAD
+        files:
+          - path: "tenants/**/*.yaml"
+  template:
+    metadata:
+      name: "eso-{{.tenant.name}}-{{.tenant.environment}}"
+      labels:
+        platform.idp/tenant: "{{.tenant.name}}"
+        platform.idp/environment: "{{.tenant.environment}}"
+        platform.idp/layer: secrets
+    spec:
+      project: default
+      source:
+        repoURL: https://charts.external-secrets.io
+        chart: external-secrets
+        targetRevision: "2.6.0"      # released 2026-06-07 (appVersion v2.6.0)
+        helm:
+          releaseName: external-secrets
+          valuesObject:
+            installCRDs: true        # ESO CRDs (incl. generators) inside the vCluster
+            # Lean footprint for a per-tenant vCluster.
+            replicaCount: 1
+            webhook:
+              replicaCount: 1
+            certController:
+              replicaCount: 1
+            # No external providers needed — only the in-cluster Password generator.
+      destination:
+        # name => the tenant's vCluster registered in Argo (NOT the host).
+        name: "vcluster-{{.tenant.name}}-{{.tenant.environment}}"
+        namespace: external-secrets
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          # ESO CRDs are large → server-side apply avoids the last-applied annotation limit.
+          - ServerSideApply=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 5m

@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# ═══════════════════════════════════════════════════════════════════════════
+# register-vcluster — register a vCluster as an ArgoCD cluster (Fase 2)
+# ───────────────────────────────────────────────────────────────────────────
+# Platform/SRE operation. Creates an ArgoCD cluster Secret pointing at the
+# vCluster's IN-CLUSTER service URL (ArgoCD runs in the host and reaches it),
+# so the tenant-workloads ApplicationSet can deploy INTO the vCluster.
+#
+# Why not `argocd cluster add`: that connects from your laptop, which can't
+# resolve the in-cluster svc DNS. The declarative Secret is the reliable path.
+#
+# Usage:  ./cli/register-vcluster <vcluster-name> [namespace]
+#   e.g.  ./cli/register-vcluster vcluster-tenant-a-dev
+# Env overrides: ARGOCD_NS (argocd), VC_KUBECONFIG_SECRET (vc-<ns>), VC_SERVER.
+# ═══════════════════════════════════════════════════════════════════════════
+set -euo pipefail
+
+VC="${1:?usage: register-vcluster <vcluster-name> [namespace]}"
+NS="${2:-$VC}"
+ARGOCD_NS="${ARGOCD_NS:-argocd}"
+SECRET="${VC_KUBECONFIG_SECRET:-vc-$NS}"
+# Server URL = <svc>.<namespace> (NO `.svc` suffix): the vCluster API cert SANs
+# include `<vc>.<ns>` but NOT `<vc>.<ns>.svc`, and `<vc>.<ns>` still resolves via
+# the cluster DNS search domain. Using the full `.svc` triggers an x509 SAN error.
+SERVER="${VC_SERVER:-https://$VC.$NS:443}"
+
+# vCluster's admin kubeconfig (its server is localhost; we override with SERVER).
+KCFG="$(kubectl -n "$NS" get secret "$SECRET" -o jsonpath='{.data.config}' | base64 -d 2>/dev/null || true)"
+[ -n "$KCFG" ] || { echo "✗ no kubeconfig found in secret '$SECRET' (ns $NS). Check: kubectl -n $NS get secret" >&2; exit 1; }
+
+# Pull the base64 PEM blobs straight from the kubeconfig (no re-encoding).
+CA="$(printf '%s\n' "$KCFG"   | awk '/certificate-authority-data:/{print $2; exit}')"
+CERT="$(printf '%s\n' "$KCFG" | awk '/client-certificate-data:/{print $2; exit}')"
+KEY="$(printf '%s\n' "$KCFG"  | awk '/client-key-data:/{print $2; exit}')"
+[ -n "$CA$CERT$KEY" ] || { echo "✗ could not extract cert data from kubeconfig" >&2; exit 1; }
+
+kubectl -n "$ARGOCD_NS" apply -f - <<EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: $VC
+  namespace: $ARGOCD_NS
+  labels:
+    argocd.argoproj.io/secret-type: cluster
+    platform.idp/managed-by: register-vcluster
+type: Opaque
+stringData:
+  name: $VC
+  server: $SERVER
+  config: |
+    {"tlsClientConfig":{"insecure":false,"caData":"$CA","certData":"$CERT","keyData":"$KEY"}}
+EOF
+
+echo "✔ registered ArgoCD cluster '$VC' → $SERVER"
+echo "  (if you hit a TLS SAN error, re-run with VC_SERVER set or insecure — see notes)"

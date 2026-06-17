@@ -1,0 +1,130 @@
+#!/usr/bin/env bash
+# ═══════════════════════════════════════════════════════════════════════════
+# validate — run the VALIDACION.md catalog and report PASS/FAIL per requirement.
+#
+# Usage:   ./cli/validate [tenant] [env]
+#   e.g.   ./cli/validate tenant-a dev
+# Env:     PEER_TENANT (default tenant-b, for the isolation test), PLATFORM_DOMAIN,
+#          ARGOCD_NS (default argocd). Flag: --drift runs the destructive drift test.
+#
+# Requires: kubectl, helm, vcluster CLI, curl. Run from the repo root.
+# ═══════════════════════════════════════════════════════════════════════════
+set -uo pipefail
+
+TENANT="${1:-tenant-a}"
+ENV="${2:-${PLATFORM_ENV:-dev}}"
+DOMAIN="${PLATFORM_DOMAIN:-example.local}"
+PEER="${PEER_TENANT:-tenant-b}"
+ARGOCD_NS="${ARGOCD_NS:-argocd}"
+DRIFT=false; [[ " $* " == *" --drift "* ]] && DRIFT=true
+
+NS="vcluster-${TENANT}-${ENV}"      # vCluster namespace on the host
+VNS="${TENANT}"                     # namespace inside the vCluster
+
+PASS=0; FAIL=0; SKIP=0
+g(){ printf '\033[32m%s\033[0m' "$1"; }; r(){ printf '\033[31m%s\033[0m' "$1"; }; y(){ printf '\033[33m%s\033[0m' "$1"; }
+ok(){   PASS=$((PASS+1)); echo "  $(g PASS) $1"; }
+no(){   FAIL=$((FAIL+1)); echo "  $(r FAIL) $1${2:+  — $2}"; }
+skip(){ SKIP=$((SKIP+1)); echo "  $(y SKIP) $1${2:+  — $2}"; }
+sec(){ echo; echo "── $1"; }
+vc(){ vcluster connect "$NS" -n "$NS" -- "$@" 2>/dev/null; }
+
+echo "validate: tenant=$TENANT env=$ENV (ns=$NS)  peer=$PEER"
+
+# ── Fase 0 — estático ───────────────────────────────────────────────────────
+sec "Static (Fase 0)"
+helm lint charts/tenant >/dev/null 2>&1 && ok "helm lint charts/tenant" || no "helm lint charts/tenant"
+helm template t charts/tenant --set tenant.name="$TENANT" --set tenant.environment="$ENV" 2>/dev/null \
+  | grep -q 'argocd.argoproj.io/sync-wave' && ok "sync-wave annotations render (req 10)" || no "sync-wave annotations render"
+
+# ── Platform / GitOps ───────────────────────────────────────────────────────
+sec "Platform / GitOps"
+for as in tenant-vclusters tenant-workloads tenant-routes; do
+  kubectl -n "$ARGOCD_NS" get applicationset "$as" >/dev/null 2>&1 && ok "ApplicationSet $as" || no "ApplicationSet $as"
+done
+for app in "vcluster-$TENANT-$ENV" "wl-$TENANT-$ENV" "route-$TENANT-$ENV"; do
+  h=$(kubectl -n "$ARGOCD_NS" get application "$app" -o jsonpath='{.status.health.status}' 2>/dev/null)
+  [ "$h" = "Healthy" ] && ok "$app Healthy" || no "$app health" "${h:-not found}"
+done
+
+# ── vCluster + registro (req 1, 2, Fase 2) ─────────────────────────────────
+sec "vCluster + registration"
+vcluster list 2>/dev/null | grep -qE "^\s*$NS\s.*Running" && ok "vCluster $NS Running (req 1)" || no "vCluster $NS Running"
+kubectl -n "$ARGOCD_NS" get secret -l argocd.argoproj.io/secret-type=cluster -o name 2>/dev/null \
+  | grep -q "/$NS$" && ok "vCluster registered in ArgoCD (Fase 2)" || no "vCluster registered in ArgoCD"
+
+# ── Req 3 — namespace + pg + 2 apps + credenciales ──────────────────────────
+sec "Req 3 — tenant contents"
+vc kubectl get statefulset "$TENANT-postgres" -n "$VNS" >/dev/null 2>&1 && ok "PostgreSQL StatefulSet" || no "PostgreSQL StatefulSet"
+vc kubectl get deploy "$TENANT-customer-api" -n "$VNS" >/dev/null 2>&1 && ok "customer-api Deployment" || no "customer-api Deployment"
+vc kubectl get deploy "$TENANT-customer-web" -n "$VNS" >/dev/null 2>&1 && ok "customer-web Deployment" || no "customer-web Deployment"
+pw=$(vc kubectl get secret "$TENANT-postgres" -n "$VNS" -o jsonpath='{.data.password}' 2>/dev/null | tail -1)
+[ -n "$pw" ] && ok "Postgres Secret auto-generated (req 8)" || no "Postgres Secret"
+
+# ── Req 5 — version management ───────────────────────────────────────────────
+sec "Req 5 — version management"
+want=$(awk '/^[[:space:]]*api:/{f=1} f&&/version:/{gsub(/[" ]/,"",$2); print $2; exit}' "tenants/$ENV/$TENANT.yaml" 2>/dev/null)
+got=$(vc kubectl get deploy "$TENANT-customer-api" -n "$VNS" -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null | tail -1 | sed 's/.*://')
+if [ -n "$want" ] && [ "$want" = "$got" ]; then ok "api image tag = $got (matches tenant.yaml)"
+else no "api image tag" "want=$want got=$got"; fi
+
+# ── Req 6 — resource governance ─────────────────────────────────────────────
+sec "Req 6 — resource governance"
+vc kubectl get resourcequota "$TENANT-quota" -n "$VNS" >/dev/null 2>&1 && ok "ResourceQuota" || no "ResourceQuota"
+vc kubectl get limitrange "$TENANT-limits" -n "$VNS" >/dev/null 2>&1 && ok "LimitRange" || no "LimitRange"
+
+# ── Req 7 — network isolation ───────────────────────────────────────────────
+sec "Req 7 — network isolation"
+kubectl -n "$NS" get ciliumnetworkpolicy "$TENANT-isolation" >/dev/null 2>&1 \
+  && ok "CiliumNetworkPolicy present" || no "CiliumNetworkPolicy present"
+APIP=$(kubectl -n "$NS" get svc -o jsonpath='{range .items[*]}{.metadata.name}={.spec.clusterIP}{"\n"}{end}' 2>/dev/null | grep customer-web | head -1 | cut -d= -f2)
+if [ -n "$APIP" ] && kubectl get ns "vcluster-$PEER-$ENV" >/dev/null 2>&1; then
+  out=$(kubectl -n "vcluster-$PEER-$ENV" run "idp-probe-$$" --rm -i --restart=Never --image=curlimages/curl -- \
+          sh -c "curl -m 5 -s -o /dev/null -w 'CODE=%{http_code}' http://$APIP/" 2>/dev/null)
+  code=$(printf '%s' "$out" | grep -oE 'CODE=[0-9]+' | head -1 | cut -d= -f2)
+  [ "${code:-000}" = "000" ] && ok "cross-tenant $PEER → $TENANT DENIED" || no "cross-tenant isolation" "HTTP $code (expected 000)"
+else
+  skip "cross-tenant probe" "peer vcluster-$PEER-$ENV / service no disponible"
+fi
+
+# ── Req 12 — external access (Gateway API + TLS) ────────────────────────────
+sec "Req 12 — external access"
+prog=$(kubectl -n "$NS" get gateway "$TENANT-gateway" -o jsonpath='{.status.conditions[?(@.type=="Programmed")].status}' 2>/dev/null)
+[ "$prog" = "True" ] && ok "Gateway Programmed" || no "Gateway Programmed" "${prog:-not found}"
+IP=$(kubectl -n "$NS" get gateway "$TENANT-gateway" -o jsonpath='{.status.addresses[0].value}' 2>/dev/null)
+if [ -n "$IP" ]; then
+  for app in web api; do
+    code=$(curl -k -m 5 -s -o /dev/null -w '%{http_code}' --resolve "$app.$TENANT.$DOMAIN:443:$IP" "https://$app.$TENANT.$DOMAIN/" 2>/dev/null)
+    [ "$code" = "200" ] && ok "HTTPS $app.$TENANT.$DOMAIN → 200" || no "HTTPS $app reachable" "HTTP ${code:-?}"
+  done
+else no "Gateway address" "no LB IP"; fi
+cert=$(kubectl -n "$NS" get certificate "$TENANT-tls" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null)
+[ "$cert" = "True" ] && ok "TLS cert $TENANT-tls Ready (cert-manager)" || skip "TLS cert" "${cert:-no cert (HTTP mode?)}"
+
+# ── Req 13 — scoped tenant access ───────────────────────────────────────────
+sec "Req 13 — tenant access"
+vc kubectl get ns >/dev/null 2>&1 && ok "vcluster connect → scoped kubeconfig" || no "vcluster connect"
+
+# ── Req 9 — idempotencia ────────────────────────────────────────────────────
+sec "Req 9 — idempotency"
+out=$(./cli/platform "$TENANT" create 2>&1; ./cli/platform "$TENANT" create 2>&1)
+echo "$out" | grep -qiE 'idempotent|nothing to commit' && ok "platform create x2 = idempotent" || no "idempotency" "no idempotent message"
+
+# ── Req 10/11 — failure handling / drift ────────────────────────────────────
+sec "Req 10/11 — failure handling / drift"
+kubectl -n "$ARGOCD_NS" get application "wl-$TENANT-$ENV" -o jsonpath='{.status.health.status}' 2>/dev/null \
+  | grep -q Healthy && ok "workload Healthy (sync waves + health gating, req 10)" || no "workload Healthy"
+if $DRIFT; then
+  echo "  (drift) deleting $TENANT-customer-web; waiting for selfHeal…"
+  vc kubectl delete deployment "$TENANT-customer-web" -n "$VNS" >/dev/null 2>&1
+  for i in $(seq 1 18); do sleep 10; vc kubectl get deploy "$TENANT-customer-web" -n "$VNS" >/dev/null 2>&1 && break; done
+  vc kubectl get deploy "$TENANT-customer-web" -n "$VNS" >/dev/null 2>&1 \
+    && ok "drift self-heal: customer-web recreated (req 11)" || no "drift self-heal" "no recreado en 180s"
+else
+  skip "drift self-heal (req 11)" "destructivo; correr con --drift"
+fi
+
+# ── Resumen ─────────────────────────────────────────────────────────────────
+echo
+echo "Resultado: $(g "$PASS PASS")  /  $(r "$FAIL FAIL")  /  $(y "$SKIP SKIP")"
+[ "$FAIL" -eq 0 ]

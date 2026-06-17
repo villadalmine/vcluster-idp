@@ -1,0 +1,35 @@
+%% IDP multi-tenant — fully decentralized GitOps (ArgoCD per cluster)
+%% Management SCOPE = CAPI only. It creates clusters and SEEDS each one with its own
+%% ArgoCD via a CAPI ClusterResourceSet (one-shot). It does NOT run a central ArgoCD
+%% and does NOT deploy tenants. Every host cluster is the SAME self-managing pattern.
+flowchart TB
+  classDef sre fill:#dbeafe,stroke:#2563eb,color:#1e3a8a;
+  classDef tenant fill:#dcfce7,stroke:#16a34a,color:#14532d;
+  classDef gitops fill:#fef9c3,stroke:#ca8a04,color:#713f12;
+
+  GIT["Git repo (source of truth)<br/>charts · applicationsets · platform · tenants/&lt;env&gt;"]:::gitops
+  CLI["platform CLI<br/>(dev/customer)"]:::tenant
+
+  subgraph MGMT["Management cluster — Platform/SRE — SCOPE: CAPI only"]
+    direction TB
+    CAPI["CAPI<br/>create / upgrade / delete clusters"]:::sre
+    CRS["ClusterResourceSet<br/>seed ArgoCD + platform-root (one-shot)"]:::sre
+  end
+
+  subgraph HOST["Host cluster — per env (dev / acceptance / prod) — SAME pattern x N"]
+    direction TB
+    ARGO["ArgoCD (local, self-managing)"]:::gitops
+    ROOT["platform-root (app-of-apps)<br/>add-ons + ApplicationSets"]:::gitops
+    subgraph VC["vCluster = tenant (isolated control plane)"]
+      WL["Workload — Helm chart (golden path)<br/>ns·quota·netpol·secret·pg·api·web·Gateway+TLS"]:::tenant
+    end
+  end
+
+  CAPI -->|"provisions"| HOST
+  CRS -.->|"seeds ONCE on creation"| ARGO
+  ARGO -->|"pulls & reconciles"| GIT
+  ARGO --> ROOT
+  ROOT -->|"appset #1: provision"| VC
+  ROOT -->|"appset #2: deploy chart inside"| WL
+  CLI -->|"commit tenant.yaml"| GIT
+  CLI -.->|"connect / operate (vcluster, status)"| HOST

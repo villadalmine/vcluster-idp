@@ -46,6 +46,12 @@ spec:
             # flip this for a reviewer's vanilla cluster.
             externalAccess:
               mode: gateway
+            # Secret backend declared per tenant under tenant.secretBackend in
+            # tenants/<env>/<tenant>.yaml (generated | eso). `dig` defaults to
+            # `generated` when the key is absent (so existing tenants keep working).
+            # `eso` needs the tenant-eso ApplicationSet applied (ESO in the vCluster).
+            postgres:
+              secretBackend: '{{ dig "tenant" "secretBackend" "generated" . }}'
             tenant:
               name: "{{.tenant.name}}"
               environment: "{{.tenant.environment}}"
