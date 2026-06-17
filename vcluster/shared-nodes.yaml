@@ -1,15 +1,11 @@
 # ═══ vcluster.yaml — SHARED NODES (the DEMO model, RUNS) ════════════════════
 # Each tenant = a vCluster with its own control plane (API server + etcd + CRDs),
-# sharing the host cluster's worker nodes. Real control-plane isolation;
-# residual risk = shared node kernel (see the isolation spectrum).
+# sharing the host cluster's worker nodes. Real control-plane isolation; residual
+# risk = shared node kernel (see the isolation spectrum).
+#
+# NOTE (vCluster 0.35): the distro is k8s (vanilla) by default — k3s was removed
+# from the chart — so we do NOT override controlPlane.distro.
 controlPlane:
-  distro:
-    k3s:                 # embedded k3s: lightweight, the shared-nodes default
-      enabled: true
-  backingStore:
-    etcd:
-      embedded:
-        enabled: true
   statefulSet:
     resources:
       requests:
@@ -20,17 +16,18 @@ sync:
     # Tenant Ingresses synced to the host (legacy external-access path).
     ingresses:
       enabled: true
-    # Gateway API: tenant Gateway/HTTPRoute/TLSRoute/ReferenceGrant synced to the
-    # host (with reference rewriting). This is what makes `externalAccess.mode=gateway`
-    # work — the host Gateway controller (Cilium) serves the tenant's routes.
+    # Gateway API: tenant Gateway/HTTPRoute/TLSRoute synced to the host (with
+    # reference rewriting). Makes externalAccess.mode=gateway work end-to-end.
     gatewayApi:
       enabled: true
   fromHost:
+    # Import host nodes so the tenant scheduler sees them (needed for nodeSelector,
+    # e.g. pinning to the GPU node srv-t7910).
     nodes:
       enabled: true
       selector:
         all: true
-    # Import the host GatewayClasses (e.g. `cilium`) into the tenant so a tenant
-    # Gateway can reference `gatewayClassName: cilium` without its own controller.
+    # Import the host GatewayClasses (e.g. `cilium`) so a tenant Gateway can
+    # reference gatewayClassName: cilium without its own controller.
     gatewayClasses:
       enabled: true
