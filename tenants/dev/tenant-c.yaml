@@ -2,6 +2,7 @@ tenant:
   name: tenant-c
   environment: dev
   domain: example.local
+  secretBackend: eso   # generated | eso (ADR-07)
 applications:
   api:
     version: "2.23.1"
