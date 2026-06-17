@@ -17,3 +17,10 @@ gateway:
 tls:
   enabled: false
   clusterIssuer: cluster-home-ca-issuer
+
+# Host-side network isolation (enforced by Cilium where the synced pods actually run;
+# the in-vCluster standard NetworkPolicy is NOT enforced on the host). Uses a
+# CiliumNetworkPolicy because allowing the L7 Gateway proxy needs the `ingress`
+# entity — standard NetworkPolicy can't express it. Set false on a non-Cilium cluster.
+isolation:
+  enabled: true

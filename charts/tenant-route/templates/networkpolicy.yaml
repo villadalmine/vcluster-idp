@@ -1,0 +1,22 @@
+{{- if .Values.isolation.enabled }}
+# Host-side network isolation (requirement 7) — CiliumNetworkPolicy.
+# Enforced by Cilium on the HOST, where the vCluster-synced pods actually run (the
+# in-vCluster standard NetworkPolicy is not enforced there). Once this selects the
+# pods, Cilium default-denies ingress and only allows what's listed:
+#   - same namespace  = same tenant (intra-tenant east-west)
+#   - entity `ingress` = the Cilium Gateway/Ingress L7 proxy (north-south)
+# Result: tenant-a <- tenant-b is DENIED, but the Gateway and intra-tenant work.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: {{ .Values.tenant.name }}-isolation
+  labels:
+    {{- include "route.labels" . | nindent 4 }}
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEndpoints:
+        - {}
+    - fromEntities:
+        - ingress
+{{- end }}
