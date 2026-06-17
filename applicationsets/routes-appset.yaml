@@ -40,6 +40,11 @@ spec:
               name: "{{.tenant.name}}"
               environment: "{{.tenant.environment}}"
               domain: "{{.tenant.domain}}"
+            # TLS per tenant at the Gateway (cert-manager gateway-shim). Requires
+            # enableGatewayAPI in cert-manager (infra-ai). The CA issuer signs
+            # *.<tenant>.<domain>.
+            tls:
+              enabled: true
       destination:
         # HOST cluster (NOT the vCluster), in the synced-Services namespace.
         server: https://kubernetes.default.svc
