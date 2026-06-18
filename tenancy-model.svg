@@ -1,0 +1,100 @@
+<svg viewBox="0 0 760 575" xmlns="http://www.w3.org/2000/svg" role="img" font-family="ui-sans-serif, system-ui, sans-serif">
+  <title>IDP tenancy model: one host cluster provides a curated baseline to every vCluster</title>
+  <desc>A host Kubernetes cluster runs a platform layer (ArgoCD ApplicationSets) that injects a baseline of services (ESO/secrets, Gateway with TLS, ResourceQuota/LimitRange, NetworkPolicy default-deny) into each per-tenant vCluster. Each tenant gets cluster-admin of a ready-to-use virtual cluster and only deploys their apps. Workloads run on shared host nodes via the syncer. Below, a spectrum compares namespaces, vCluster, and real clusters by cost and isolation.</desc>
+  <style>
+    text { fill: #1a1a1a; }
+    .sub { fill: #5a5a5a; }
+    .info { fill: #1f6feb; }
+    .host { fill: rgba(130,130,130,0.05); }
+    .panel { fill: rgba(130,130,130,0.10); }
+    .vc { fill: rgba(130,130,130,0.08); }
+    .ns { fill: rgba(130,130,130,0.10); }
+    .spec { fill: rgba(130,130,130,0.06); }
+    rect { stroke: #c9c9c9; }
+    @media (prefers-color-scheme: dark) {
+      text { fill: #e6e6e6; } .sub { fill: #a0a0a0; } .info { fill: #58a6ff; }
+      rect { stroke: #444; }
+    }
+  </style>
+  <defs>
+    <marker id="ah" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L6,3 L0,6 Z" fill="#888"/>
+    </marker>
+  </defs>
+
+  <text x="380" y="28" text-anchor="middle" font-size="17" font-weight="700">One host cluster &#8594; N vClusters, each ready to use</text>
+  <text x="380" y="47" text-anchor="middle" font-size="12.5" class="sub">the platform curates the baseline &#183; tenants just ship apps</text>
+
+  <rect x="20" y="62" width="720" height="378" rx="12" class="host"/>
+  <text x="36" y="82" font-size="11.5" font-weight="700" class="sub">HOST KUBERNETES CLUSTER &#183; owned by the platform team</text>
+
+  <rect x="36" y="92" width="688" height="44" rx="8" class="panel"/>
+  <text x="48" y="114" font-size="13.5" font-weight="700">Platform layer &#183; ArgoCD ApplicationSets (GitOps)</text>
+  <text x="48" y="129" font-size="11.5" class="sub">owns the vCluster lifecycle + decides the baseline for everyone</text>
+  <text x="712" y="121" text-anchor="end" font-size="11" font-weight="700" class="info">injects baseline &#8595;</text>
+
+  <g>
+    <rect x="46" y="148" width="212" height="234" rx="9" class="vc"/>
+    <text x="60" y="170" font-size="12.5" font-weight="700">vCluster &#183; tenant-a</text>
+    <text x="60" y="185" font-size="10.5" class="sub">own API &#183; cluster-admin</text>
+    <rect x="58" y="194" width="188" height="98" rx="7" fill="none" stroke="#1f6feb" stroke-dasharray="3 2.5"/>
+    <text x="67" y="210" font-size="9.5" font-weight="700" class="info">PLATFORM BASELINE</text>
+    <text x="67" y="228" font-size="11">&#8226; ESO (secrets)</text>
+    <text x="67" y="245" font-size="11">&#8226; Gateway + TLS</text>
+    <text x="67" y="262" font-size="11">&#8226; Quota &#183; LimitRange</text>
+    <text x="67" y="279" font-size="11">&#8226; NetPol default-deny</text>
+    <rect x="58" y="302" width="188" height="66" rx="7" class="ns"/>
+    <text x="67" y="322" font-size="11" font-weight="700">ns: tenant-a (tenant-owned)</text>
+    <text x="67" y="339" font-size="10.5" class="sub">apps + Postgres &#183; can add</text>
+    <text x="67" y="353" font-size="10.5" class="sub">more namespaces freely</text>
+  </g>
+
+  <g>
+    <rect x="272" y="148" width="212" height="234" rx="9" class="vc"/>
+    <text x="286" y="170" font-size="12.5" font-weight="700">vCluster &#183; tenant-b</text>
+    <text x="286" y="185" font-size="10.5" class="sub">own API &#183; cluster-admin</text>
+    <rect x="284" y="194" width="188" height="98" rx="7" fill="none" stroke="#1f6feb" stroke-dasharray="3 2.5"/>
+    <text x="293" y="210" font-size="9.5" font-weight="700" class="info">PLATFORM BASELINE</text>
+    <text x="293" y="228" font-size="11">&#8226; ESO (secrets)</text>
+    <text x="293" y="245" font-size="11">&#8226; Gateway + TLS</text>
+    <text x="293" y="262" font-size="11">&#8226; Quota &#183; LimitRange</text>
+    <text x="293" y="279" font-size="11">&#8226; NetPol default-deny</text>
+    <rect x="284" y="302" width="188" height="66" rx="7" class="ns"/>
+    <text x="293" y="322" font-size="11" font-weight="700">ns: tenant-b (tenant-owned)</text>
+    <text x="293" y="339" font-size="10.5" class="sub">isolated from tenant-a:</text>
+    <text x="293" y="353" font-size="10.5" class="sub">separate API, can't see it</text>
+  </g>
+
+  <g>
+    <rect x="498" y="148" width="212" height="234" rx="9" class="vc"/>
+    <text x="512" y="170" font-size="12.5" font-weight="700">vCluster &#183; tenant-c</text>
+    <text x="512" y="185" font-size="10.5" class="sub">own API &#183; cluster-admin</text>
+    <rect x="510" y="194" width="188" height="98" rx="7" fill="none" stroke="#1f6feb" stroke-dasharray="3 2.5"/>
+    <text x="519" y="210" font-size="9.5" font-weight="700" class="info">PLATFORM BASELINE</text>
+    <text x="519" y="228" font-size="11">&#8226; ESO (secrets)</text>
+    <text x="519" y="245" font-size="11">&#8226; Gateway + TLS</text>
+    <text x="519" y="262" font-size="11">&#8226; Quota &#183; LimitRange</text>
+    <text x="519" y="279" font-size="11">&#8226; NetPol default-deny</text>
+    <rect x="510" y="302" width="188" height="66" rx="7" class="ns"/>
+    <text x="519" y="322" font-size="11" font-weight="700">ns: tenant-c (tenant-owned)</text>
+    <text x="519" y="339" font-size="10.5" class="sub">+ can go off-road</text>
+    <text x="519" y="353" font-size="10.5" class="sub">(install their own tools)</text>
+  </g>
+
+  <rect x="36" y="392" width="688" height="38" rx="8" class="panel"/>
+  <text x="380" y="415" text-anchor="middle" font-size="11.5" class="sub">Shared host nodes — tenant pods actually run here (via the vCluster syncer)</text>
+
+  <text x="380" y="470" text-anchor="middle" font-size="12.5" font-weight="700">Choose by the isolation you need — vCluster is the middle</text>
+  <rect x="60" y="482" width="200" height="50" rx="8" class="spec"/>
+  <text x="160" y="502" text-anchor="middle" font-size="11.5" font-weight="700">Namespaces</text>
+  <text x="160" y="518" text-anchor="middle" font-size="10" class="sub">lowest ops &#183; weak isolation</text>
+  <rect x="280" y="482" width="200" height="50" rx="8" class="spec" stroke="#1f6feb" stroke-width="1.6"/>
+  <text x="380" y="502" text-anchor="middle" font-size="11.5" font-weight="700" class="info">vCluster (this design)</text>
+  <text x="380" y="518" text-anchor="middle" font-size="10" class="sub">cluster-admin + CRDs &#183; medium cost</text>
+  <rect x="500" y="482" width="200" height="50" rx="8" class="spec"/>
+  <text x="600" y="502" text-anchor="middle" font-size="11.5" font-weight="700">Real cluster per tenant</text>
+  <text x="600" y="518" text-anchor="middle" font-size="10" class="sub">strongest isolation &amp; cost</text>
+  <line x1="60" y1="552" x2="700" y2="552" stroke="#888" stroke-width="1" marker-end="url(#ah)"/>
+  <text x="60" y="546" font-size="10" class="sub">cheaper / less isolated</text>
+  <text x="700" y="546" text-anchor="end" font-size="10" class="sub">costlier / more isolated</text>
+</svg>
