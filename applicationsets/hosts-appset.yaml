@@ -23,6 +23,10 @@ spec:
         revision: HEAD
         files:
           - path: "tenants/**/*.yaml"
+        # Poll interval to detect new/changed tenant files (default 180s). Lowering it
+        # kills propagation latency WITHOUT a webhook — needed in a homelab where GitHub
+        # can't reach the internal ArgoCD. Production: Git webhook → instant (ADR-15).
+        requeueAfterSeconds: 30
   template:
     metadata:
       name: "vcluster-{{.tenant.name}}-{{.tenant.environment}}"

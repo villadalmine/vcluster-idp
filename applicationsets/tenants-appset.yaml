@@ -24,6 +24,9 @@ spec:
         revision: HEAD
         files:
           - path: "tenants/**/*.yaml"
+        # Detect new/changed tenant files fast (default 180s) — no webhook needed
+        # (homelab: GitHub can't reach the internal ArgoCD). Prod: webhook (ADR-15).
+        requeueAfterSeconds: 30
   template:
     metadata:
       name: "wl-{{.tenant.name}}-{{.tenant.environment}}"
