@@ -1,0 +1,16 @@
+# CRS de Cilium — mismo mecanismo que calico, pero matchea los Cluster con label cni=cilium
+# (acceptance y prod). dev usa Calico. Cilium en ipam.mode=kubernetes usa el podCIDR que k8s
+# asigna desde clusterNetwork.pods, así que no hace falta hardcodear el CIDR.
+apiVersion: addons.cluster.x-k8s.io/v1beta1
+kind: ClusterResourceSet
+metadata:
+  name: cilium-cni
+  namespace: fleet
+spec:
+  clusterSelector:
+    matchLabels:
+      cni: cilium
+  strategy: ApplyOnce
+  resources:
+    - name: cilium-cni
+      kind: ConfigMap

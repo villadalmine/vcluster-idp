@@ -1,0 +1,24 @@
+# Host cluster ACCEPTANCE (host-a = dev). CNI = Cilium (dev usa Calico).
+# ArgoCD (fleet-hostclusters) lo toma al pushear -> Crossplane compone -> CAPI/CAPK bootean
+# las VMs en srv-t7910 -> kubeadm instala k8s -> el CRS cilium-cni inyecta Cilium -> Ready.
+# OJO: al pushear se crean VMs reales (1 CP + 1 worker) en t7910.
+apiVersion: fleet.homelab.io/v1alpha1
+kind: HostCluster
+metadata:
+  name: host-b
+  namespace: fleet
+  labels:
+    env: acceptance
+spec:
+  crossplane:
+    compositionRef:
+      name: hostcluster-kubevirt
+  kubernetesVersion: v1.31.5
+  controlPlaneReplicas: 1
+  workerReplicas: 1
+  cpuCores: 2
+  memory: "4Gi"
+  vmNodeHostname: srv-t7910
+  nodeArch: amd64
+  nodeImage: quay.io/capk/ubuntu-2404-container-disk:v1.31.5
+  cni: cilium

@@ -8,10 +8,14 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: fleet
 resources:
-  - clusterresourceset.yaml
+  - clusterresourceset.yaml          # CRS Calico (dev)
+  - clusterresourceset-cilium.yaml   # CRS Cilium (acceptance/prod)
 configMapGenerator:
   - name: calico-cni
     files:
       - calico.yaml
+  - name: cilium-cni
+    files:
+      - cilium.yaml
 generatorOptions:
-  disableNameSuffixHash: true   # el CRS referencia el ConfigMap por nombre exacto (calico-cni)
+  disableNameSuffixHash: true   # los CRS referencian los ConfigMap por nombre exacto (calico-cni / cilium-cni)
