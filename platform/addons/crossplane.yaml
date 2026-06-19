@@ -1,0 +1,24 @@
+# Child app of platform-root: install Crossplane v2 (the composition engine).
+# v2 = namespaced XRs, no claims, composes any resource (incl. a CAPI Cluster).
+# The XRD/Composition/Function/RBAC live in fleet/config (synced by fleet-config).
+# sync-wave 1 → engine before the XRD/Composition (fleet-config, wave 3).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: crossplane
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: default
+  source:
+    repoURL: https://charts.crossplane.io/stable
+    chart: crossplane
+    targetRevision: "2.3.0"           # verify: helm search repo crossplane-stable/crossplane
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: crossplane-system
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions:
+      - CreateNamespace=true

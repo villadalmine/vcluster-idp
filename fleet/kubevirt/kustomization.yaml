@@ -1,0 +1,8 @@
+# KubeVirt install for GitOps: upstream operator (remote) + our CR.
+# Cluster is on k8s 1.35.5 → KubeVirt v1.8.0 is correct (built for 1.35, supports 1.35/1.34/1.33).
+# If you later upgrade k8s, bump this tag to the release whose support matrix lists that version.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - https://github.com/kubevirt/kubevirt/releases/download/v1.8.0/kubevirt-operator.yaml
+  - kubevirt-cr.yaml

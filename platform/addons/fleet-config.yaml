@@ -1,0 +1,25 @@
+# Child app of platform-root: the DECLARATIVE fleet config that depends on the
+# operators above — CAPI Provider CRs (CoreProvider/Bootstrap/ControlPlane/CAPK) and
+# the Crossplane Function + RBAC + XRD + Composition.
+# sync-wave 3 → applied AFTER cluster-api-operator + crossplane (wave 1) are Healthy.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: fleet-config
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/villadalmine/vcluster-idp.git
+    targetRevision: HEAD
+    path: fleet/config            # provider CRs + crossplane function/rbac/xrd/composition
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: crossplane-system
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions:
+      - ServerSideApply=true
+      - SkipDryRunOnMissingResource=true   # CRDs (providers/XRD) appear during sync

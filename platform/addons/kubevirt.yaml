@@ -1,0 +1,27 @@
+# Child app of platform-root: install KubeVirt (runs the VMs that become host-cluster
+# nodes). Uses a kustomize base that pulls the upstream operator + our CR (which pins
+# VM workloads to the x86 KVM node, srv-t7910). sync-wave 1 → before CAPK provider CRs.
+#
+# Alternative (chosen split): install the heavy operator from Ansible (install-kubevirt
+# role) and keep ONLY the CR in Git. This App is the fully-GitOps variant.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kubevirt
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/villadalmine/vcluster-idp.git
+    targetRevision: HEAD
+    path: fleet/kubevirt          # kustomization.yaml = upstream operator + kubevirt-cr.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kubevirt
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true       # KubeVirt operator CRDs are large

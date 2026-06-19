@@ -1,0 +1,21 @@
+# KubeVirt CR — pin VM-hosting components to the x86 KVM node (srv-t7910), real KVM.
+# Same content the install-kubevirt Ansible role applies; here it is GitOps-managed.
+apiVersion: kubevirt.io/v1
+kind: KubeVirt
+metadata:
+  name: kubevirt
+  namespace: kubevirt
+spec:
+  certificateRotateStrategy: {}
+  imagePullPolicy: IfNotPresent
+  workloads:
+    nodePlacement:
+      nodeSelector:
+        kubernetes.io/hostname: srv-t7910   # only node with /dev/kvm
+  configuration:
+    developerConfiguration:
+      useEmulation: false                   # real virtualization (VT-x)
+      featureGates:
+        - DataVolumes
+        - LiveMigration
+        - Snapshot

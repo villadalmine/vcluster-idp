@@ -1,0 +1,30 @@
+# Child app of platform-root: install the Cluster API Operator (declarative CAPI).
+# This is the GitOps equivalent of `clusterctl init` — instead of a CLI pushing YAML
+# once, ArgoCD installs the operator and (via fleet/config Provider CRs) the providers.
+# Ansible only bootstraps ArgoCD + platform-root; from there this is all Git-driven.
+# sync-wave 1 → operator before the Provider CRs (fleet-config, wave 3).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cluster-api-operator
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: default
+  source:
+    repoURL: https://kubernetes-sigs.github.io/cluster-api-operator
+    chart: cluster-api-operator
+    targetRevision: "0.21.0"          # verify: helm search repo capi-operator/cluster-api-operator
+    helm:
+      values: |
+        cert-manager:
+          enabled: false              # reuse the cluster's existing jetstack cert-manager
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: capi-operator-system
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

@@ -1,0 +1,37 @@
+# Crossplane v2 XRD — the HostCluster API. v2: apiextensions/v2, scope Namespaced,
+# NO claim (the namespaced HostCluster XR is the user-facing request).
+apiVersion: apiextensions.crossplane.io/v2
+kind: CompositeResourceDefinition
+metadata:
+  name: hostclusters.fleet.homelab.io
+spec:
+  scope: Namespaced
+  group: fleet.homelab.io
+  names:
+    kind: HostCluster
+    plural: hostclusters
+  versions:
+    - name: v1alpha1
+      served: true
+      referenceable: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                kubernetesVersion: { type: string, default: "v1.31.0" }
+                controlPlaneReplicas: { type: integer, default: 1 }
+                workerReplicas: { type: integer, default: 1 }
+                cpuCores: { type: integer, default: 2 }
+                memory: { type: string, default: "4Gi" }
+                vmNodeHostname: { type: string, default: "srv-t7910" }
+                nodeImage:
+                  type: string
+                  default: "quay.io/capk/ubuntu-2404-container-disk:v1.31.0"
+              required: [kubernetesVersion]
+            status:
+              type: object
+              properties:
+                clusterName: { type: string }

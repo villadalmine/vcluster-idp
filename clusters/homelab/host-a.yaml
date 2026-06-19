@@ -1,0 +1,20 @@
+# Homelab host cluster REQUEST. Crossplane v2: this namespaced HostCluster XR IS the
+# request (no claim). ArgoCD applies it; Crossplane renders the Composition →
+# CAPI objects → CAPK boots VMs on srv-t7910 → a real workload k8s cluster.
+# This is the "fleet/ = HostCluster requests" box the diagrams show ArgoCD reading.
+apiVersion: fleet.homelab.io/v1alpha1
+kind: HostCluster
+metadata:
+  name: host-a
+  namespace: fleet
+spec:
+  crossplane:
+    compositionRef:
+      name: hostcluster-kubevirt
+  kubernetesVersion: v1.31.0
+  controlPlaneReplicas: 1
+  workerReplicas: 1
+  cpuCores: 2
+  memory: "4Gi"
+  vmNodeHostname: srv-t7910
+  nodeImage: quay.io/capk/ubuntu-2404-container-disk:v1.31.0

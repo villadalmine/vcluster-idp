@@ -1,0 +1,25 @@
+# Child app of platform-root: applies the homelab HostCluster REQUESTS (XRs) from
+# clusters/homelab/. Separate from the OpenStack example + bootstrap-crs (those are
+# code/ADR, not auto-applied). sync-wave 5 → after the XRD/Composition (fleet-config).
+# In a fleet this would be an ApplicationSet (like hosts-appset) generating one per env.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: fleet-hostclusters
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/villadalmine/vcluster-idp.git
+    targetRevision: HEAD
+    path: clusters/homelab
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: fleet
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions:
+      - CreateNamespace=true
+      - SkipDryRunOnMissingResource=true   # the HostCluster CRD appears via fleet-config
