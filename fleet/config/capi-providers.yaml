@@ -1,6 +1,24 @@
 # Declarative CAPI providers (Cluster API Operator reconciles these into the same
 # CRDs + controllers that `clusterctl init` installs imperatively). This is the
 # GitOps install of CAPI: edit a version + let ArgoCD sync = upgrade.
+# Provider namespaces (clusterctl creates these; the GitOps operator does not, so we
+# declare them — ArgoCD applies Namespaces before the namespaced Provider CRs).
+---
+apiVersion: v1
+kind: Namespace
+metadata: { name: capi-system }
+---
+apiVersion: v1
+kind: Namespace
+metadata: { name: capi-kubeadm-bootstrap-system }
+---
+apiVersion: v1
+kind: Namespace
+metadata: { name: capi-kubeadm-control-plane-system }
+---
+apiVersion: v1
+kind: Namespace
+metadata: { name: capk-system }
 ---
 apiVersion: operator.cluster.x-k8s.io/v1alpha2
 kind: CoreProvider
