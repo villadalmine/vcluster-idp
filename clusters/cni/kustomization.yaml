@@ -1,0 +1,17 @@
+# ArgoCD (path clusters/cni) renderiza esto con kustomize:
+#   - el ClusterResourceSet
+#   - un ConfigMap `calico-cni` cuyo contenido ES el manifest de Calico (calico.yaml)
+# calico.yaml NO se aplica directo (kustomize lo consume como dato del generator), así que
+# Calico NO se instala en el management — sólo queda empaquetado para que el CRS lo inyecte
+# en el workload. Todo en el namespace `fleet` (donde viven los Cluster de CAPI).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: fleet
+resources:
+  - clusterresourceset.yaml
+configMapGenerator:
+  - name: calico-cni
+    files:
+      - calico.yaml
+generatorOptions:
+  disableNameSuffixHash: true   # el CRS referencia el ConfigMap por nombre exacto (calico-cni)

@@ -1,0 +1,18 @@
+# ClusterResourceSet — el mecanismo CAPI-nativo (ver BOOTSTRAP-CLUSTERRESOURCESET.md) que
+# inyecta manifests en CADA cluster que CAPI crea con el label correspondiente, en cuanto
+# nace. Acá: el CNI (Calico). Sin CNI los nodos quedan NotReady. El CNI debe entrar ANTES
+# que cualquier ArgoCD dentro del workload (los pods necesitan red), por eso va por CRS y no
+# por una Application de ArgoCD apuntando al workload.
+apiVersion: addons.cluster.x-k8s.io/v1beta1
+kind: ClusterResourceSet
+metadata:
+  name: calico-cni
+  namespace: fleet
+spec:
+  clusterSelector:
+    matchLabels:
+      cni: calico            # matchea los Cluster de CAPI que la Composition etiqueta cni=calico
+  strategy: ApplyOnce        # una sola vez al nacer el cluster; CAPI lo aplica con el kubeconfig del workload
+  resources:
+    - name: calico-cni       # el ConfigMap (generado por kustomize) que CONTIENE el manifest de Calico
+      kind: ConfigMap

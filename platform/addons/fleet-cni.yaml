@@ -1,0 +1,24 @@
+# Child app of platform-root: empaqueta el CNI (Calico) como ConfigMap + ClusterResourceSet
+# en el management. CAPI (vía el CRS) lo inyecta en cada workload cluster con label cni=calico
+# al nacer -> los nodos pasan de NotReady a Ready. sync-wave 4 -> después de fleet-config
+# (wave 3, que trae los Provider CRs/CRS CRD) y antes/junto a los HostCluster (wave 5).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: fleet-cni
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/villadalmine/vcluster-idp.git
+    targetRevision: HEAD
+    path: clusters/cni          # kustomize: CRS + ConfigMap(calico.yaml)
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: fleet
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions:
+      - ServerSideApply=true     # el ConfigMap de Calico es grande; SSA evita el límite de last-applied annotation
