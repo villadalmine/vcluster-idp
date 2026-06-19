@@ -1,0 +1,25 @@
+# Child app of platform-root: CDI (importer de discos de VM). Permite que el disco de la VM
+# sea un DataVolume sobre Longhorn (el "vSAN") en vez del containerDisk efímero. sync-wave 1
+# (con kubevirt/crossplane/operator).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cdi
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/villadalmine/vcluster-idp.git
+    targetRevision: HEAD
+    path: fleet/cdi
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cdi
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true          # los CRDs de CDI son grandes
+      - SkipDryRunOnMissingResource=true

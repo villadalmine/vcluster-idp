@@ -1,0 +1,11 @@
+# El CR que activa CDI (el operator lo reconcilia en el dataplane).
+apiVersion: cdi.kubevirt.io/v1beta1
+kind: CDI
+metadata:
+  name: cdi
+spec:
+  imagePullPolicy: IfNotPresent
+  config:
+    # respeta WaitForFirstConsumer de la SC (Longhorn provisiona donde corre la VM)
+    featureGates:
+      - HonorWaitForFirstConsumer

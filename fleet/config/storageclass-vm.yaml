@@ -1,0 +1,17 @@
+# StorageClass para los DISCOS DE VM (en el management = el hypervisor). Longhorn sobre los
+# discos NVMe de los rk1 (diskSelector: nvme → /mnt/nvme, no el eMMC default-disk).
+# REPLICA 2 a propósito: los host clusters son recreables por GitOps, no necesitan 3 copias
+# → duplica la capacidad útil (~877 GB → ~21 VMs de 40 GB). Ver FLEET-HCI-STORAGE-NETWORKING.md.
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: longhorn-vm
+provisioner: driver.longhorn.io
+allowVolumeExpansion: true
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
+parameters:
+  numberOfReplicas: "2"
+  diskSelector: "nvme"
+  fsType: ext4
+  staleReplicaTimeout: "2880"
