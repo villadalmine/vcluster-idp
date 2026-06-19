@@ -2,23 +2,32 @@
 # CRDs + controllers that `clusterctl init` installs imperatively). This is the
 # GitOps install of CAPI: edit a version + let ArgoCD sync = upgrade.
 # Provider namespaces (clusterctl creates these; the GitOps operator does not, so we
-# declare them — ArgoCD applies Namespaces before the namespaced Provider CRs).
+# declare them). sync-wave "-1" → applied in an earlier phase than the Provider CRs
+# (wave 0), so the namespaces exist before the namespaced providers land.
 ---
 apiVersion: v1
 kind: Namespace
-metadata: { name: capi-system }
+metadata:
+  name: capi-system
+  annotations: { argocd.argoproj.io/sync-wave: "-1" }
 ---
 apiVersion: v1
 kind: Namespace
-metadata: { name: capi-kubeadm-bootstrap-system }
+metadata:
+  name: capi-kubeadm-bootstrap-system
+  annotations: { argocd.argoproj.io/sync-wave: "-1" }
 ---
 apiVersion: v1
 kind: Namespace
-metadata: { name: capi-kubeadm-control-plane-system }
+metadata:
+  name: capi-kubeadm-control-plane-system
+  annotations: { argocd.argoproj.io/sync-wave: "-1" }
 ---
 apiVersion: v1
 kind: Namespace
-metadata: { name: capk-system }
+metadata:
+  name: capk-system
+  annotations: { argocd.argoproj.io/sync-wave: "-1" }
 ---
 apiVersion: operator.cluster.x-k8s.io/v1alpha2
 kind: CoreProvider
