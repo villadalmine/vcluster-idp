@@ -155,7 +155,7 @@ spec:
                                   spec:
                                     pvc:
                                       accessModes: [ReadWriteOnce]
-                                      resources: { requests: { storage: 40Gi } }
+                                      resources: { requests: { storage: 30Gi } }
                                       storageClassName: longhorn-vm
                                     source:
                                       registry:
@@ -264,7 +264,7 @@ spec:
                                   spec:
                                     pvc:
                                       accessModes: [ReadWriteOnce]
-                                      resources: { requests: { storage: 40Gi } }
+                                      resources: { requests: { storage: 30Gi } }
                                       storageClassName: longhorn-vm
                                     source:
                                       registry:
