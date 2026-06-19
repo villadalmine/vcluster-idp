@@ -1,0 +1,25 @@
+# El "region-root" de eu-west1: un app-of-apps que se SIEMBRA dentro del ArgoCD del cluster
+# regional (no se aplica en el management). Apunta a clusters/regions/eu-west1/apps -> ahí está
+# el ApplicationSet que provisiona los vCluster de los tenants de la región, en el propio cluster.
+# Este archivo NO se aplica directo: kustomize lo empaqueta en el ConfigMap region-root-eu-west1
+# y el ClusterResourceSet lo inyecta en el cluster con label platform.idp/region=eu-west1.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: region-root
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/villadalmine/vcluster-idp.git
+    targetRevision: HEAD
+    path: clusters/regions/eu-west1/apps
+    directory:
+      recurse: true
+  destination:
+    server: https://kubernetes.default.svc   # el propio cluster regional
+    namespace: argocd
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions:
+      - CreateNamespace=true

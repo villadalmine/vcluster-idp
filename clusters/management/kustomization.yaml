@@ -1,0 +1,18 @@
+# fleet-management (path clusters/management) lo renderiza con kustomize:
+#   - el HelmChartProxy que instala ArgoCD en los clusters role=management
+#   - el ClusterResourceSet que siembra el region-root de eu-west1
+#   - un ConfigMap (region-root-eu-west1) cuyo contenido ES el Application region-root
+# region-root-eu-west1.yaml NO se aplica directo (kustomize lo consume como dato del generator),
+# así el region-root sólo se inyecta en el cluster regional vía el CRS, no en el management.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: fleet
+resources:
+  - helmchartproxy-argocd.yaml
+  - region-root-crs.yaml
+configMapGenerator:
+  - name: region-root-eu-west1
+    files:
+      - region-root-eu-west1.yaml
+generatorOptions:
+  disableNameSuffixHash: true   # el CRS referencia el ConfigMap por nombre exacto

@@ -20,37 +20,14 @@ spec:
   options:
     install:
       createNamespace: true
-  # valuesTemplate se renderiza por-cluster con Go templating (.Cluster = el objeto Cluster de
-  # CAPI). Si el cluster tiene label platform.idp/region, ArgoCD nace con un "region-root"
-  # (app-of-apps) que apunta a clusters/regions/<region>/apps -> ahí está el ApplicationSet que
-  # provisiona los vCluster de los tenants de ESA región, en el propio cluster (destino local).
-  # Así el ArgoCD del management NO deploya tenants: cada cluster regional despliega los suyos.
+  # Sólo instala ArgoCD. El "region-root" (app-of-apps por región) NO se siembra acá:
+  # el chart instala el CRD Application y un extraObjects que lo referencia falla en el build
+  # de helm ("ensure CRDs are installed first" — el CRD aún no está registrado). Por eso el
+  # region-root lo siembra un ClusterResourceSet (region-root-crs.yaml), que reintenta hasta que
+  # el CRD exista. Desacopla el seed del timing del helm install.
   valuesTemplate: |
     crds:
       install: true
     configs:
       params:
         server.insecure: true   # homelab; detrás de un Gateway/ingress con TLS en prod
-    {{- $region := index .Cluster.metadata.labels "platform.idp/region" }}
-    {{- if $region }}
-    extraObjects:
-      - apiVersion: argoproj.io/v1alpha1
-        kind: Application
-        metadata:
-          name: region-root
-          namespace: argocd
-        spec:
-          project: default
-          source:
-            repoURL: https://github.com/villadalmine/vcluster-idp.git
-            targetRevision: HEAD
-            path: clusters/regions/{{ $region }}/apps
-            directory:
-              recurse: true
-          destination:
-            server: https://kubernetes.default.svc   # el propio cluster regional
-            namespace: argocd
-          syncPolicy:
-            automated: { prune: true, selfHeal: true }
-            syncOptions: [CreateNamespace=true]
-    {{- end }}

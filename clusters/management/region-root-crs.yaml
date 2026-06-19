@@ -1,0 +1,16 @@
+# Siembra el region-root en el ArgoCD del cluster regional eu-west1. Desacoplado del helm
+# install de ArgoCD: el CRS reintenta (ApplyOnce) hasta que el CRD Application exista en el
+# workload (lo instala CAAPH), así no choca con el race del extraObjects. Una región = un CRS.
+apiVersion: addons.cluster.x-k8s.io/v1beta1
+kind: ClusterResourceSet
+metadata:
+  name: region-root-eu-west1
+  namespace: fleet
+spec:
+  clusterSelector:
+    matchLabels:
+      platform.idp/region: eu-west1
+  strategy: ApplyOnce
+  resources:
+    - name: region-root-eu-west1
+      kind: ConfigMap
