@@ -34,6 +34,7 @@ spec:
                 nodeImage:
                   type: string
                   default: "quay.io/capk/ubuntu-2404-container-disk:v1.31.5"
+                diskSize: { type: string, default: "40Gi" }     # disco de la VM = DataVolume sobre longhorn-vm (no el containerDisk efímero de 10Gi)
               required: [kubernetesVersion]
             status:
               type: object
