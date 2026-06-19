@@ -1,0 +1,48 @@
+# ApplicationSet que corre en el ArgoCD del CLUSTER REGIONAL eu-west1 (sembrado por el
+# region-root del HelmChartProxy). Lee los tenants de ESTA región y provisiona un vCluster por
+# tenant EN ESTE cluster (destination = kubernetes.default.svc = el regional). Es el mismo
+# patrón que applicationsets/hosts-appset.yaml del management, pero scopeado a la región y
+# corriendo en el ArgoCD del regional (no en el del management). Así el management no deploya
+# tenants: cada cluster regional despliega los suyos.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: vclusters-eu-west1
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - git:
+        repoURL: https://github.com/villadalmine/vcluster-idp.git
+        revision: HEAD
+        files:
+          - path: "clusters/regions/eu-west1/tenants/**/*.yaml"
+        requeueAfterSeconds: 30
+  template:
+    metadata:
+      name: "vcluster-{{.tenant.name}}-{{.tenant.environment}}"
+      labels:
+        platform.idp/tenant: "{{.tenant.name}}"
+        platform.idp/environment: "{{.tenant.environment}}"
+        platform.idp/region: eu-west1
+        platform.idp/layer: vcluster
+    spec:
+      project: default
+      source:
+        repoURL: https://charts.loft.sh
+        chart: vcluster
+        targetRevision: "0.35.0"
+        helm:
+          releaseName: "{{.tenant.name}}-{{.tenant.environment}}"
+      destination:
+        server: https://kubernetes.default.svc          # el propio cluster regional
+        namespace: "vcluster-{{.tenant.name}}-{{.tenant.environment}}"
+      syncPolicy:
+        automated: { prune: true, selfHeal: true }
+        syncOptions:
+          - CreateNamespace=true
+          - SkipDryRunOnMissingResource=true
+        retry:
+          limit: 5
+          backoff: { duration: 10s, factor: 2, maxDuration: 5m }

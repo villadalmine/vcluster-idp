@@ -1,0 +1,13 @@
+# Tenant dev en la región eu-west1. Lo lee el ApplicationSet vclusters-eu-west1 (que corre en
+# el ArgoCD del cluster regional) y materializa un vCluster aislado en ese cluster.
+# Está FUERA de tenants/ (el path global) a propósito: así los appsets del management
+# (tenants/**) no lo agarran — cada región es independiente.
+tenant:
+  name: tenant-a
+  environment: dev
+  domain: eu-west1.example.com
+applications:
+  api:
+    version: "2.23.0"
+  web:
+    version: "1.26-alpine"
