@@ -116,8 +116,8 @@ spec:
                 transforms: [{ type: string, string: { type: Format, fmt: "%s-control-plane" } }]
               - { type: FromCompositeFieldPath, fromFieldPath: spec.cpuCores, toFieldPath: spec.template.spec.virtualMachineTemplate.spec.template.spec.domain.cpu.cores }
               - { type: FromCompositeFieldPath, fromFieldPath: spec.memory, toFieldPath: spec.template.spec.virtualMachineTemplate.spec.template.spec.domain.memory.guest }
-              - { type: FromCompositeFieldPath, fromFieldPath: spec.nodeImage, toFieldPath: spec.template.spec.virtualMachineTemplate.spec.template.spec.volumes[0].containerDisk.image }
-              - { type: FromCompositeFieldPath, fromFieldPath: spec.vmNodeHostname, toFieldPath: spec.template.spec.virtualMachineTemplate.spec.template.spec.nodeSelector["kubernetes.io/hostname"] }
+              - { type: FromCompositeFieldPath, fromFieldPath: spec.nodeImage, toFieldPath: 'spec.template.spec.virtualMachineTemplate.spec.template.spec.volumes[0].containerDisk.image' }
+              - { type: FromCompositeFieldPath, fromFieldPath: spec.vmNodeHostname, toFieldPath: 'spec.template.spec.virtualMachineTemplate.spec.template.spec.nodeSelector["kubernetes.io/hostname"]' }
 
           - name: machinedeployment
             base:
@@ -184,8 +184,8 @@ spec:
                 transforms: [{ type: string, string: { type: Format, fmt: "%s-md-0" } }]
               - { type: FromCompositeFieldPath, fromFieldPath: spec.cpuCores, toFieldPath: spec.template.spec.virtualMachineTemplate.spec.template.spec.domain.cpu.cores }
               - { type: FromCompositeFieldPath, fromFieldPath: spec.memory, toFieldPath: spec.template.spec.virtualMachineTemplate.spec.template.spec.domain.memory.guest }
-              - { type: FromCompositeFieldPath, fromFieldPath: spec.nodeImage, toFieldPath: spec.template.spec.virtualMachineTemplate.spec.template.spec.volumes[0].containerDisk.image }
-              - { type: FromCompositeFieldPath, fromFieldPath: spec.vmNodeHostname, toFieldPath: spec.template.spec.virtualMachineTemplate.spec.template.spec.nodeSelector["kubernetes.io/hostname"] }
+              - { type: FromCompositeFieldPath, fromFieldPath: spec.nodeImage, toFieldPath: 'spec.template.spec.virtualMachineTemplate.spec.template.spec.volumes[0].containerDisk.image' }
+              - { type: FromCompositeFieldPath, fromFieldPath: spec.vmNodeHostname, toFieldPath: 'spec.template.spec.virtualMachineTemplate.spec.template.spec.nodeSelector["kubernetes.io/hostname"]' }
 
           - name: md-bootstrap
             base:
