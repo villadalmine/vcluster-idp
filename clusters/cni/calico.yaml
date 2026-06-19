@@ -50,9 +50,11 @@ data:
   calico_backend: "bird"
 
   # Configure the MTU to use for workload interfaces and tunnels.
-  # By default, MTU is auto-detected, and explicitly setting this field should not be required.
-  # You can override auto-detection by providing a non-zero value.
-  veth_mtu: "0"
+  # Auto-detection gives 1480 (1500-20 IPIP), but these are KubeVirt nested clusters: the VM's
+  # pod network runs OVER the management Cilium VXLAN (-50) -> real underlay ~1450. 1480 > 1450
+  # makes cross-node pod packets drop (DNS/Services time out). Pin to 1400 with margin.
+  # See FLEET-KUBEVIRT-NETWORKING.md.
+  veth_mtu: "1400"
 
   # The CNI network configuration to install on each node. The special
   # values in this config will be automatically populated.
