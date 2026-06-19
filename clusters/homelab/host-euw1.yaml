@@ -24,6 +24,6 @@ spec:
   vmNodeHostname: srv-t7910
   nodeArch: amd64
   nodeImage: quay.io/capk/ubuntu-2404-container-disk:v1.31.5
-  cni: cilium
+  cni: calico               # Cilium no rutea ClusterIP/DNS en estos clusters KubeVirt anidados (MTU/overlay); Calico sí (probado vs host-a)
   role: management
   region: eu-west1
