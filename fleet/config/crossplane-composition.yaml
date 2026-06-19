@@ -60,6 +60,7 @@ spec:
                 transforms: [{ type: string, string: { type: Format, fmt: "%s-control-plane" } }]
               - { type: FromCompositeFieldPath, fromFieldPath: metadata.name, toFieldPath: spec.forProvider.manifest.spec.infrastructureRef.name }
               - { type: FromCompositeFieldPath, fromFieldPath: spec.cni, toFieldPath: spec.forProvider.manifest.metadata.labels.cni }   # selecciona qué CRS de CNI inyecta (calico/cilium)
+              - { type: FromCompositeFieldPath, fromFieldPath: spec.role, toFieldPath: 'spec.forProvider.manifest.metadata.labels["platform.idp/role"]' }   # host|management → HelmChartProxy de ArgoCD matchea management
               - { type: ToCompositeFieldPath, fromFieldPath: spec.forProvider.manifest.metadata.name, toFieldPath: status.clusterName }
 
           - name: kubevirtcluster

@@ -29,6 +29,12 @@ metadata:
   name: capk-system
   annotations: { argocd.argoproj.io/sync-wave: "-1" }
 ---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: caaph-system
+  annotations: { argocd.argoproj.io/sync-wave: "-1" }
+---
 apiVersion: operator.cluster.x-k8s.io/v1alpha2
 kind: CoreProvider
 metadata:
@@ -59,3 +65,14 @@ spec:
   # CAPK v0.10.5 = last v1beta1 contract (CAPI v1.10.x). v0.11.x pulls CAPI v1.11.1
   # (v1beta2) which the operator (installing core v1.10.10) rejects: CAPIVersionIncompatibility.
   version: "v0.10.5"
+---
+# Cluster API Addon Provider for Helm (CAAPH) — installs the HelmChartProxy CRD/controller,
+# the CAPI-native way to install a Helm addon (e.g. ArgoCD) INTO a workload cluster.
+# v0.4.2 = last v1beta1-contract release (v0.5+ needs CAPI v1.11/v1beta2, same gate as CAPK).
+apiVersion: operator.cluster.x-k8s.io/v1alpha2
+kind: AddonProvider
+metadata:
+  name: helm
+  namespace: caaph-system
+spec:
+  version: "v0.4.2"

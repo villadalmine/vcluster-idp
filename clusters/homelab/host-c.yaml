@@ -1,6 +1,5 @@
-# Host cluster PROD. CNI = Cilium. controlPlaneReplicas debería ser 3 para HA real; en el
-# homelab queda en 1 para no saturar srv-t7910 (subilo a 3 si hay recursos).
-# OJO: al pushear se crean VMs reales (1 CP + 1 worker) en t7910.
+# Host cluster PROD. CNI = Cilium. control-plane HA (3 réplicas) = etcd con quórum 2/3.
+# OJO: al pushear se crean VMs reales (3 CP + 1 worker) en t7910.
 apiVersion: fleet.homelab.io/v1alpha1
 kind: HostCluster
 metadata:
@@ -13,7 +12,7 @@ spec:
     compositionRef:
       name: hostcluster-kubevirt
   kubernetesVersion: v1.31.5
-  controlPlaneReplicas: 1        # prod real = 3 (HA)
+  controlPlaneReplicas: 3        # HA: etcd quórum 2/3
   workerReplicas: 1
   cpuCores: 2
   memory: "4Gi"

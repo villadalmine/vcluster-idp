@@ -1,0 +1,28 @@
+# MANAGEMENT child cluster — un host cluster que además recibe ArgoCD (vía el HelmChartProxy
+# de CAAPH, porque role=management). Es el primer escalón del "management jerárquico": un
+# cluster creado por CAPI que se vuelve capaz de auto-gestionarse. Para que sea management
+# COMPLETO (que cree sus propios clusters) faltaría sumarle CAPI (otro HelmChartProxy) y un
+# platform-root ACOTADO (ver FLEET-DISENO-COMPLETO.md §"management jerárquico" — la recursión
+# de fleet-hostclusters se scopa por management, no se siembra el platform-root global).
+# OJO: al pushear se crean VMs reales (1 CP + 1 worker) en t7910.
+apiVersion: fleet.homelab.io/v1alpha1
+kind: HostCluster
+metadata:
+  name: host-mgmt
+  namespace: fleet
+  labels:
+    env: management
+spec:
+  crossplane:
+    compositionRef:
+      name: hostcluster-kubevirt
+  kubernetesVersion: v1.31.5
+  controlPlaneReplicas: 1
+  workerReplicas: 1
+  cpuCores: 2
+  memory: "4Gi"
+  vmNodeHostname: srv-t7910
+  nodeArch: amd64
+  nodeImage: quay.io/capk/ubuntu-2404-container-disk:v1.31.5
+  cni: cilium
+  role: management

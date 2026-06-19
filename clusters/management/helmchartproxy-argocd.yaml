@@ -1,0 +1,26 @@
+# HelmChartProxy (CAAPH) — instala ArgoCD DENTRO de cada cluster con label
+# platform.idp/role=management, usando Helm. Es la forma CAPI-nativa de instalar un addon
+# pesado en un workload (sin el límite de tamaño de un ConfigMap/CRS). CAAPH corre en el
+# management, espera a que el cluster esté listo, y aplica el chart vía su kubeconfig.
+# Así un "host cluster" se vuelve "management" (primer escalón: ya tiene su motor GitOps).
+apiVersion: addons.cluster.x-k8s.io/v1alpha1
+kind: HelmChartProxy
+metadata:
+  name: argocd
+  namespace: fleet
+spec:
+  clusterSelector:
+    matchLabels:
+      platform.idp/role: management
+  repoURL: https://argoproj.github.io/argo-helm
+  chartName: argo-cd
+  # version: 7.8.2          # pinear para reproducibilidad; sin pin, CAAPH instala el último
+  releaseName: argocd
+  namespace: argocd
+  options:
+    install:
+      createNamespace: true
+  valuesTemplate: |
+    configs:
+      params:
+        server.insecure: true   # homelab; detrás de un Gateway/ingress con TLS en prod

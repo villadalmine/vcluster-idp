@@ -1,0 +1,25 @@
+# Child app of platform-root: el wiring de "management child" — el HelmChartProxy que
+# instala ArgoCD en los clusters role=management (CAAPH lo aplica en el workload).
+# sync-wave 4 -> después de fleet-config (wave 3, que instala CAAPH vía AddonProvider) y
+# junto a fleet-cni; antes/junto a los HostCluster (wave 5).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: fleet-management
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/villadalmine/vcluster-idp.git
+    targetRevision: HEAD
+    path: clusters/management
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: fleet
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions:
+      - ServerSideApply=true
+      - SkipDryRunOnMissingResource=true   # el CRD HelmChartProxy aparece cuando CAAPH instala

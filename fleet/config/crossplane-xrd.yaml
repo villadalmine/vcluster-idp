@@ -29,6 +29,7 @@ spec:
                 vmNodeHostname: { type: string, default: "srv-t7910" }
                 nodeArch: { type: string, default: "amd64" }   # VMI architecture; must match the pinned node's kubernetes.io/arch (KubeVirt won't infer it)
                 cni: { type: string, default: "calico" }        # which CNI the ClusterResourceSet injects: "calico" (dev) or "cilium" (acc/prod)
+                role: { type: string, default: "host" }          # "host" (plain workload) or "management" (CAAPH HelmChartProxy installs ArgoCD into it)
                 nodeImage:
                   type: string
                   default: "quay.io/capk/ubuntu-2404-container-disk:v1.31.5"
