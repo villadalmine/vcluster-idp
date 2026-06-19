@@ -1,5 +1,8 @@
 # Crossplane v2 plumbing: the patch-and-transform Function (native patch&transform was
-# removed in v2) + RBAC so Crossplane may compose non-Crossplane resources (CAPI CRDs).
+# removed in v2). The CAPI objects are no longer composed directly — they are wrapped in
+# provider-kubernetes Objects (see crossplane-composition.yaml), and that provider's SA
+# carries the CAPI RBAC (fleet/config/provider-kubernetes/rbac.yaml). So the old
+# aggregated CAPI ClusterRole on Crossplane's own SA is gone.
 ---
 apiVersion: pkg.crossplane.io/v1
 kind: Function
@@ -8,18 +11,3 @@ metadata:
 spec:
   # v2 requires a fully-qualified package image. Verify latest tag on the repo releases.
   package: xpkg.crossplane.io/crossplane-contrib/function-patch-and-transform:v0.9.0
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: crossplane-compose-capi
-  labels:
-    rbac.crossplane.io/aggregate-to-crossplane: "true"   # aggregated into Crossplane's role
-rules:
-  - apiGroups:
-      - cluster.x-k8s.io
-      - infrastructure.cluster.x-k8s.io
-      - bootstrap.cluster.x-k8s.io
-      - controlplane.cluster.x-k8s.io
-    resources: ["*"]
-    verbs: ["*"]

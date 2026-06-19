@@ -1,0 +1,24 @@
+# Child app of platform-root: install provider-kubernetes (the Object wrapper used by the
+# HostCluster Composition to cede CAPI-object ownership to CAPI). sync-wave 2 → after the
+# Crossplane engine (wave 1), before the Composition that uses it (fleet-config, wave 3).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: provider-kubernetes
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/villadalmine/vcluster-idp.git
+    targetRevision: HEAD
+    path: fleet/config/provider-kubernetes   # Provider + DeploymentRuntimeConfig + ClusterProviderConfig + RBAC
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: crossplane-system
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions:
+      - ServerSideApply=true
+      - SkipDryRunOnMissingResource=true   # ClusterProviderConfig CRD appears once the package installs

@@ -1,6 +1,12 @@
-# Crossplane v2 Composition — composes the Cluster API + KubeVirt objects DIRECTLY
-# (no provider-kubernetes shim). XRD moved to /v2; Composition stays /v1.
-# Names derive from the XR name so refs line up: <xr>, <xr>-control-plane, <xr>-md-0.
+# Crossplane v2 Composition — composes the Cluster API + KubeVirt objects, each WRAPPED in
+# a provider-kubernetes `Object` (kubernetes.m.crossplane.io, namespaced) instead of
+# directly. Why: composing a CAPI object directly makes Crossplane its controller-owner,
+# which collides with CAPI's own controller-ownership (Cluster never reaches
+# infrastructureReady → no Machines → no VMs). With the Object wrapper the HostCluster XR
+# owns the Object; the CAPI object inside has NO Crossplane ownerRef, so CAPI governs it.
+# The XR is namespaced (fleet) → the Objects are composed into `fleet`; each Object needs a
+# unique name there, while the inner manifest keeps the CAPI ref names (<xr>,
+# <xr>-control-plane, <xr>-md-0) so the cross-references line up.
 apiVersion: apiextensions.crossplane.io/v1
 kind: Composition
 metadata:
@@ -21,185 +27,262 @@ spec:
 
           - name: cluster
             base:
-              apiVersion: cluster.x-k8s.io/v1beta1
-              kind: Cluster
+              apiVersion: kubernetes.m.crossplane.io/v1alpha1
+              kind: Object
               spec:
-                clusterNetwork:
-                  pods: { cidrBlocks: ["10.243.0.0/16"] }
-                  services: { cidrBlocks: ["10.95.0.0/16"] }
-                controlPlaneRef:
-                  apiVersion: controlplane.cluster.x-k8s.io/v1beta1
-                  kind: KubeadmControlPlane
-                infrastructureRef:
-                  apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
-                  kind: KubevirtCluster
+                providerConfigRef: { kind: ClusterProviderConfig, name: kubernetes-provider }
+                forProvider:
+                  manifest:
+                    apiVersion: cluster.x-k8s.io/v1beta1
+                    kind: Cluster
+                    metadata: { namespace: fleet }
+                    spec:
+                      clusterNetwork:
+                        pods: { cidrBlocks: ["10.243.0.0/16"] }
+                        services: { cidrBlocks: ["10.95.0.0/16"] }
+                      controlPlaneRef:
+                        apiVersion: controlplane.cluster.x-k8s.io/v1beta1
+                        kind: KubeadmControlPlane
+                      infrastructureRef:
+                        apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
+                        kind: KubevirtCluster
             patches:
-              - { type: FromCompositeFieldPath, fromFieldPath: metadata.name, toFieldPath: metadata.name }
               - type: FromCompositeFieldPath
                 fromFieldPath: metadata.name
-                toFieldPath: spec.controlPlaneRef.name
+                toFieldPath: metadata.name
+                transforms: [{ type: string, string: { type: Format, fmt: "%s-cluster" } }]
+              - { type: FromCompositeFieldPath, fromFieldPath: metadata.name, toFieldPath: spec.forProvider.manifest.metadata.name }
+              - type: FromCompositeFieldPath
+                fromFieldPath: metadata.name
+                toFieldPath: spec.forProvider.manifest.spec.controlPlaneRef.name
                 transforms: [{ type: string, string: { type: Format, fmt: "%s-control-plane" } }]
-              - { type: FromCompositeFieldPath, fromFieldPath: metadata.name, toFieldPath: spec.infrastructureRef.name }
-              - { type: ToCompositeFieldPath, fromFieldPath: metadata.name, toFieldPath: status.clusterName }
+              - { type: FromCompositeFieldPath, fromFieldPath: metadata.name, toFieldPath: spec.forProvider.manifest.spec.infrastructureRef.name }
+              - { type: ToCompositeFieldPath, fromFieldPath: spec.forProvider.manifest.metadata.name, toFieldPath: status.clusterName }
 
           - name: kubevirtcluster
             base:
-              apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
-              kind: KubevirtCluster
+              apiVersion: kubernetes.m.crossplane.io/v1alpha1
+              kind: Object
               spec:
-                controlPlaneServiceTemplate:
-                  spec:
-                    type: ClusterIP
+                providerConfigRef: { kind: ClusterProviderConfig, name: kubernetes-provider }
+                forProvider:
+                  manifest:
+                    apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
+                    kind: KubevirtCluster
+                    metadata: { namespace: fleet }
+                    spec:
+                      controlPlaneServiceTemplate:
+                        spec:
+                          type: ClusterIP
             patches:
-              - { type: FromCompositeFieldPath, fromFieldPath: metadata.name, toFieldPath: metadata.name }
+              - type: FromCompositeFieldPath
+                fromFieldPath: metadata.name
+                toFieldPath: metadata.name
+                transforms: [{ type: string, string: { type: Format, fmt: "%s-kvcluster" } }]
+              - { type: FromCompositeFieldPath, fromFieldPath: metadata.name, toFieldPath: spec.forProvider.manifest.metadata.name }
 
           - name: controlplane
             base:
-              apiVersion: controlplane.cluster.x-k8s.io/v1beta1
-              kind: KubeadmControlPlane
+              apiVersion: kubernetes.m.crossplane.io/v1alpha1
+              kind: Object
               spec:
-                machineTemplate:
-                  infrastructureRef:
-                    apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
-                    kind: KubevirtMachineTemplate
-                kubeadmConfigSpec:
-                  clusterConfiguration:
-                    networking: { dnsDomain: cluster.local }
-                  initConfiguration:
-                    nodeRegistration:
-                      criSocket: /var/run/containerd/containerd.sock
-                      kubeletExtraArgs: {}
-                  joinConfiguration:
-                    nodeRegistration:
-                      criSocket: /var/run/containerd/containerd.sock
-                      kubeletExtraArgs: {}
+                providerConfigRef: { kind: ClusterProviderConfig, name: kubernetes-provider }
+                forProvider:
+                  manifest:
+                    apiVersion: controlplane.cluster.x-k8s.io/v1beta1
+                    kind: KubeadmControlPlane
+                    metadata: { namespace: fleet }
+                    spec:
+                      machineTemplate:
+                        infrastructureRef:
+                          apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
+                          kind: KubevirtMachineTemplate
+                      kubeadmConfigSpec:
+                        clusterConfiguration:
+                          networking: { dnsDomain: cluster.local }
+                        initConfiguration:
+                          nodeRegistration:
+                            criSocket: /var/run/containerd/containerd.sock
+                            kubeletExtraArgs: {}
+                        joinConfiguration:
+                          nodeRegistration:
+                            criSocket: /var/run/containerd/containerd.sock
+                            kubeletExtraArgs: {}
             patches:
               - type: FromCompositeFieldPath
                 fromFieldPath: metadata.name
                 toFieldPath: metadata.name
+                transforms: [{ type: string, string: { type: Format, fmt: "%s-kcp" } }]
+              - type: FromCompositeFieldPath
+                fromFieldPath: metadata.name
+                toFieldPath: spec.forProvider.manifest.metadata.name
                 transforms: [{ type: string, string: { type: Format, fmt: "%s-control-plane" } }]
               - type: FromCompositeFieldPath
                 fromFieldPath: metadata.name
-                toFieldPath: spec.machineTemplate.infrastructureRef.name
+                toFieldPath: spec.forProvider.manifest.spec.machineTemplate.infrastructureRef.name
                 transforms: [{ type: string, string: { type: Format, fmt: "%s-control-plane" } }]
-              - { type: FromCompositeFieldPath, fromFieldPath: spec.controlPlaneReplicas, toFieldPath: spec.replicas }
-              - { type: FromCompositeFieldPath, fromFieldPath: spec.kubernetesVersion, toFieldPath: spec.version }
+              - { type: FromCompositeFieldPath, fromFieldPath: spec.controlPlaneReplicas, toFieldPath: spec.forProvider.manifest.spec.replicas }
+              - { type: FromCompositeFieldPath, fromFieldPath: spec.kubernetesVersion, toFieldPath: spec.forProvider.manifest.spec.version }
 
           - name: cp-machinetemplate
             base:
-              apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
-              kind: KubevirtMachineTemplate
+              apiVersion: kubernetes.m.crossplane.io/v1alpha1
+              kind: Object
               spec:
-                template:
-                  spec:
-                    virtualMachineTemplate:
-                      spec:
-                        runStrategy: Always
-                        template:
-                          spec:
-                            evictionStrategy: External
-                            domain:
-                              cpu: { cores: 2 }
-                              memory: { guest: 4Gi }
-                              devices:
-                                disks:
-                                  - name: containervolume
-                                    disk: { bus: virtio }
-                            volumes:
-                              - name: containervolume
-                                containerDisk:
-                                  image: quay.io/capk/ubuntu-2404-container-disk:v1.31.0
+                providerConfigRef: { kind: ClusterProviderConfig, name: kubernetes-provider }
+                forProvider:
+                  manifest:
+                    apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
+                    kind: KubevirtMachineTemplate
+                    metadata: { namespace: fleet }
+                    spec:
+                      template:
+                        spec:
+                          virtualMachineTemplate:
+                            spec:
+                              runStrategy: Always
+                              template:
+                                spec:
+                                  evictionStrategy: External
+                                  domain:
+                                    cpu: { cores: 2 }
+                                    memory: { guest: 4Gi }
+                                    devices:
+                                      disks:
+                                        - name: containervolume
+                                          disk: { bus: virtio }
+                                  volumes:
+                                    - name: containervolume
+                                      containerDisk:
+                                        image: quay.io/capk/ubuntu-2404-container-disk:v1.31.0
             patches:
               - type: FromCompositeFieldPath
                 fromFieldPath: metadata.name
                 toFieldPath: metadata.name
+                transforms: [{ type: string, string: { type: Format, fmt: "%s-cpmt" } }]
+              - type: FromCompositeFieldPath
+                fromFieldPath: metadata.name
+                toFieldPath: spec.forProvider.manifest.metadata.name
                 transforms: [{ type: string, string: { type: Format, fmt: "%s-control-plane" } }]
-              - { type: FromCompositeFieldPath, fromFieldPath: spec.cpuCores, toFieldPath: spec.template.spec.virtualMachineTemplate.spec.template.spec.domain.cpu.cores }
-              - { type: FromCompositeFieldPath, fromFieldPath: spec.memory, toFieldPath: spec.template.spec.virtualMachineTemplate.spec.template.spec.domain.memory.guest }
-              - { type: FromCompositeFieldPath, fromFieldPath: spec.nodeImage, toFieldPath: 'spec.template.spec.virtualMachineTemplate.spec.template.spec.volumes[0].containerDisk.image' }
-              - { type: FromCompositeFieldPath, fromFieldPath: spec.vmNodeHostname, toFieldPath: 'spec.template.spec.virtualMachineTemplate.spec.template.spec.nodeSelector["kubernetes.io/hostname"]' }
+              - { type: FromCompositeFieldPath, fromFieldPath: spec.cpuCores, toFieldPath: spec.forProvider.manifest.spec.template.spec.virtualMachineTemplate.spec.template.spec.domain.cpu.cores }
+              - { type: FromCompositeFieldPath, fromFieldPath: spec.memory, toFieldPath: spec.forProvider.manifest.spec.template.spec.virtualMachineTemplate.spec.template.spec.domain.memory.guest }
+              - { type: FromCompositeFieldPath, fromFieldPath: spec.nodeImage, toFieldPath: 'spec.forProvider.manifest.spec.template.spec.virtualMachineTemplate.spec.template.spec.volumes[0].containerDisk.image' }
+              - { type: FromCompositeFieldPath, fromFieldPath: spec.vmNodeHostname, toFieldPath: 'spec.forProvider.manifest.spec.template.spec.virtualMachineTemplate.spec.template.spec.nodeSelector["kubernetes.io/hostname"]' }
 
           - name: machinedeployment
             base:
-              apiVersion: cluster.x-k8s.io/v1beta1
-              kind: MachineDeployment
+              apiVersion: kubernetes.m.crossplane.io/v1alpha1
+              kind: Object
               spec:
-                selector:
-                  matchLabels: {}
-                template:
-                  spec:
-                    bootstrap:
-                      configRef:
-                        apiVersion: bootstrap.cluster.x-k8s.io/v1beta1
-                        kind: KubeadmConfigTemplate
-                    infrastructureRef:
-                      apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
-                      kind: KubevirtMachineTemplate
+                providerConfigRef: { kind: ClusterProviderConfig, name: kubernetes-provider }
+                forProvider:
+                  manifest:
+                    apiVersion: cluster.x-k8s.io/v1beta1
+                    kind: MachineDeployment
+                    metadata: { namespace: fleet }
+                    spec:
+                      selector:
+                        matchLabels: {}
+                      template:
+                        spec:
+                          bootstrap:
+                            configRef:
+                              apiVersion: bootstrap.cluster.x-k8s.io/v1beta1
+                              kind: KubeadmConfigTemplate
+                          infrastructureRef:
+                            apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
+                            kind: KubevirtMachineTemplate
             patches:
               - type: FromCompositeFieldPath
                 fromFieldPath: metadata.name
                 toFieldPath: metadata.name
-                transforms: [{ type: string, string: { type: Format, fmt: "%s-md-0" } }]
-              - { type: FromCompositeFieldPath, fromFieldPath: metadata.name, toFieldPath: spec.clusterName }
-              - { type: FromCompositeFieldPath, fromFieldPath: metadata.name, toFieldPath: spec.template.spec.clusterName }
-              - { type: FromCompositeFieldPath, fromFieldPath: spec.workerReplicas, toFieldPath: spec.replicas }
-              - { type: FromCompositeFieldPath, fromFieldPath: spec.kubernetesVersion, toFieldPath: spec.template.spec.version }
+                transforms: [{ type: string, string: { type: Format, fmt: "%s-md" } }]
               - type: FromCompositeFieldPath
                 fromFieldPath: metadata.name
-                toFieldPath: spec.template.spec.bootstrap.configRef.name
+                toFieldPath: spec.forProvider.manifest.metadata.name
+                transforms: [{ type: string, string: { type: Format, fmt: "%s-md-0" } }]
+              - { type: FromCompositeFieldPath, fromFieldPath: metadata.name, toFieldPath: spec.forProvider.manifest.spec.clusterName }
+              - { type: FromCompositeFieldPath, fromFieldPath: metadata.name, toFieldPath: spec.forProvider.manifest.spec.template.spec.clusterName }
+              - { type: FromCompositeFieldPath, fromFieldPath: spec.workerReplicas, toFieldPath: spec.forProvider.manifest.spec.replicas }
+              - { type: FromCompositeFieldPath, fromFieldPath: spec.kubernetesVersion, toFieldPath: spec.forProvider.manifest.spec.template.spec.version }
+              - type: FromCompositeFieldPath
+                fromFieldPath: metadata.name
+                toFieldPath: spec.forProvider.manifest.spec.template.spec.bootstrap.configRef.name
                 transforms: [{ type: string, string: { type: Format, fmt: "%s-md-0" } }]
               - type: FromCompositeFieldPath
                 fromFieldPath: metadata.name
-                toFieldPath: spec.template.spec.infrastructureRef.name
+                toFieldPath: spec.forProvider.manifest.spec.template.spec.infrastructureRef.name
                 transforms: [{ type: string, string: { type: Format, fmt: "%s-md-0" } }]
 
           - name: md-machinetemplate
             base:
-              apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
-              kind: KubevirtMachineTemplate
+              apiVersion: kubernetes.m.crossplane.io/v1alpha1
+              kind: Object
               spec:
-                template:
-                  spec:
-                    virtualMachineTemplate:
-                      spec:
-                        runStrategy: Always
-                        template:
-                          spec:
-                            evictionStrategy: External
-                            domain:
-                              cpu: { cores: 2 }
-                              memory: { guest: 4Gi }
-                              devices:
-                                disks:
-                                  - name: containervolume
-                                    disk: { bus: virtio }
-                            volumes:
-                              - name: containervolume
-                                containerDisk:
-                                  image: quay.io/capk/ubuntu-2404-container-disk:v1.31.0
+                providerConfigRef: { kind: ClusterProviderConfig, name: kubernetes-provider }
+                forProvider:
+                  manifest:
+                    apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
+                    kind: KubevirtMachineTemplate
+                    metadata: { namespace: fleet }
+                    spec:
+                      template:
+                        spec:
+                          virtualMachineTemplate:
+                            spec:
+                              runStrategy: Always
+                              template:
+                                spec:
+                                  evictionStrategy: External
+                                  domain:
+                                    cpu: { cores: 2 }
+                                    memory: { guest: 4Gi }
+                                    devices:
+                                      disks:
+                                        - name: containervolume
+                                          disk: { bus: virtio }
+                                  volumes:
+                                    - name: containervolume
+                                      containerDisk:
+                                        image: quay.io/capk/ubuntu-2404-container-disk:v1.31.0
             patches:
               - type: FromCompositeFieldPath
                 fromFieldPath: metadata.name
                 toFieldPath: metadata.name
+                transforms: [{ type: string, string: { type: Format, fmt: "%s-mdmt" } }]
+              - type: FromCompositeFieldPath
+                fromFieldPath: metadata.name
+                toFieldPath: spec.forProvider.manifest.metadata.name
                 transforms: [{ type: string, string: { type: Format, fmt: "%s-md-0" } }]
-              - { type: FromCompositeFieldPath, fromFieldPath: spec.cpuCores, toFieldPath: spec.template.spec.virtualMachineTemplate.spec.template.spec.domain.cpu.cores }
-              - { type: FromCompositeFieldPath, fromFieldPath: spec.memory, toFieldPath: spec.template.spec.virtualMachineTemplate.spec.template.spec.domain.memory.guest }
-              - { type: FromCompositeFieldPath, fromFieldPath: spec.nodeImage, toFieldPath: 'spec.template.spec.virtualMachineTemplate.spec.template.spec.volumes[0].containerDisk.image' }
-              - { type: FromCompositeFieldPath, fromFieldPath: spec.vmNodeHostname, toFieldPath: 'spec.template.spec.virtualMachineTemplate.spec.template.spec.nodeSelector["kubernetes.io/hostname"]' }
+              - { type: FromCompositeFieldPath, fromFieldPath: spec.cpuCores, toFieldPath: spec.forProvider.manifest.spec.template.spec.virtualMachineTemplate.spec.template.spec.domain.cpu.cores }
+              - { type: FromCompositeFieldPath, fromFieldPath: spec.memory, toFieldPath: spec.forProvider.manifest.spec.template.spec.virtualMachineTemplate.spec.template.spec.domain.memory.guest }
+              - { type: FromCompositeFieldPath, fromFieldPath: spec.nodeImage, toFieldPath: 'spec.forProvider.manifest.spec.template.spec.virtualMachineTemplate.spec.template.spec.volumes[0].containerDisk.image' }
+              - { type: FromCompositeFieldPath, fromFieldPath: spec.vmNodeHostname, toFieldPath: 'spec.forProvider.manifest.spec.template.spec.virtualMachineTemplate.spec.template.spec.nodeSelector["kubernetes.io/hostname"]' }
 
           - name: md-bootstrap
             base:
-              apiVersion: bootstrap.cluster.x-k8s.io/v1beta1
-              kind: KubeadmConfigTemplate
+              apiVersion: kubernetes.m.crossplane.io/v1alpha1
+              kind: Object
               spec:
-                template:
-                  spec:
-                    joinConfiguration:
-                      nodeRegistration:
-                        criSocket: /var/run/containerd/containerd.sock
-                        kubeletExtraArgs: {}
+                providerConfigRef: { kind: ClusterProviderConfig, name: kubernetes-provider }
+                forProvider:
+                  manifest:
+                    apiVersion: bootstrap.cluster.x-k8s.io/v1beta1
+                    kind: KubeadmConfigTemplate
+                    metadata: { namespace: fleet }
+                    spec:
+                      template:
+                        spec:
+                          joinConfiguration:
+                            nodeRegistration:
+                              criSocket: /var/run/containerd/containerd.sock
+                              kubeletExtraArgs: {}
             patches:
               - type: FromCompositeFieldPath
                 fromFieldPath: metadata.name
                 toFieldPath: metadata.name
+                transforms: [{ type: string, string: { type: Format, fmt: "%s-mdbootstrap" } }]
+              - type: FromCompositeFieldPath
+                fromFieldPath: metadata.name
+                toFieldPath: spec.forProvider.manifest.metadata.name
                 transforms: [{ type: string, string: { type: Format, fmt: "%s-md-0" } }]
