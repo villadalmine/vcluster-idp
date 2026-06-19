@@ -21,7 +21,7 @@ spec:
             spec:
               type: object
               properties:
-                kubernetesVersion: { type: string, default: "v1.31.0" }
+                kubernetesVersion: { type: string, default: "v1.31.5" }
                 controlPlaneReplicas: { type: integer, default: 1 }
                 workerReplicas: { type: integer, default: 1 }
                 cpuCores: { type: integer, default: 2 }
@@ -30,7 +30,7 @@ spec:
                 nodeArch: { type: string, default: "amd64" }   # VMI architecture; must match the pinned node's kubernetes.io/arch (KubeVirt won't infer it)
                 nodeImage:
                   type: string
-                  default: "quay.io/capk/ubuntu-2404-container-disk:v1.31.0"
+                  default: "quay.io/capk/ubuntu-2404-container-disk:v1.31.5"
               required: [kubernetesVersion]
             status:
               type: object
