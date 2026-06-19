@@ -56,4 +56,6 @@ metadata:
   name: kubevirt
   namespace: capk-system
 spec:
-  version: "v0.11.1"     # CAPK — verify on the releases page
+  # CAPK v0.10.5 = last v1beta1 contract (CAPI v1.10.x). v0.11.x pulls CAPI v1.11.1
+  # (v1beta2) which the operator (installing core v1.10.10) rejects: CAPIVersionIncompatibility.
+  version: "v0.10.5"
