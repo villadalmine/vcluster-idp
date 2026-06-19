@@ -1,0 +1,88 @@
+# Auto-registro de vClusters como clusters de ArgoCD — la versión DECLARATIVA del script
+# cli/register-vcluster, corriendo DENTRO del cluster regional (su ArgoCD no alcanza el API del
+# vCluster por kubeconfig externo, pero sí por el service in-cluster). Un CronJob escanea los
+# namespaces vcluster-* , lee el kubeconfig del vCluster (secret vc-<ns>) y crea/actualiza el
+# Secret de cluster de ArgoCD apuntando a https://<vc>.<ns>:443. Idempotente (kubectl apply) y
+# se auto-cura (cada 5 min agarra vClusters nuevos). Habilita que el workloads-appset deploye
+# charts/tenant DENTRO de cada vCluster.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vcluster-register
+  namespace: argocd
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: vcluster-register
+rules:
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "create", "update", "patch"]   # leer vc-<ns>, escribir el cluster Secret en argocd
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: vcluster-register
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: vcluster-register
+subjects:
+  - kind: ServiceAccount
+    name: vcluster-register
+    namespace: argocd
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: vcluster-register
+  namespace: argocd
+spec:
+  schedule: "*/5 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        spec:
+          serviceAccountName: vcluster-register
+          restartPolicy: Never
+          containers:
+            - name: register
+              image: alpine/k8s:1.31.0          # trae kubectl + bash + awk + base64
+              command: ["/bin/bash", "-c"]
+              args:
+                - |
+                  set -eu
+                  for ns in $(kubectl get ns -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | grep -E '^vcluster-' || true); do
+                    VC="$ns"; SECRET="vc-$ns"
+                    KCFG="$(kubectl -n "$ns" get secret "$SECRET" -o jsonpath='{.data.config}' 2>/dev/null | base64 -d || true)"
+                    [ -n "$KCFG" ] || { echo "skip $ns (sin $SECRET aún)"; continue; }
+                    CA="$(printf '%s\n' "$KCFG"   | awk '/certificate-authority-data:/{print $2; exit}')"
+                    CERT="$(printf '%s\n' "$KCFG" | awk '/client-certificate-data:/{print $2; exit}')"
+                    KEY="$(printf '%s\n' "$KCFG"  | awk '/client-key-data:/{print $2; exit}')"
+                    [ -n "$CA$CERT$KEY" ] || { echo "skip $ns (sin cert)"; continue; }
+                    kubectl apply -f - <<EOF
+                  apiVersion: v1
+                  kind: Secret
+                  metadata:
+                    name: $VC
+                    namespace: argocd
+                    labels:
+                      argocd.argoproj.io/secret-type: cluster
+                      platform.idp/managed-by: vcluster-register
+                  type: Opaque
+                  stringData:
+                    name: $VC
+                    server: https://$VC.$ns:443
+                    config: |
+                      {"tlsClientConfig":{"insecure":false,"caData":"$CA","certData":"$CERT","keyData":"$KEY"}}
+                  EOF
+                    echo "registrado $VC"
+                  done

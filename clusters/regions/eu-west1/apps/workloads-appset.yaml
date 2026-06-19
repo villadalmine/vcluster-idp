@@ -1,0 +1,65 @@
+# Deploya el workload del tenant (ns·quota·netpol·secret·pg·api·web) DENTRO de su vCluster, en
+# el cluster regional. Espejo de applicationsets/tenants-appset.yaml pero scopeado a la región y
+# corriendo en el ArgoCD del regional. El destino `name: vcluster-<t>-<env>` es el cluster que
+# registra el CronJob vcluster-register. Hasta que el registro exista, esta App queda en error
+# (destino desconocido) y reintenta — consistencia eventual.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: workloads-eu-west1
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - git:
+        repoURL: https://github.com/villadalmine/vcluster-idp.git
+        revision: HEAD
+        files:
+          - path: "clusters/regions/eu-west1/tenants/**/*.yaml"
+        requeueAfterSeconds: 30
+  template:
+    metadata:
+      name: "wl-{{.tenant.name}}-{{.tenant.environment}}"
+      labels:
+        platform.idp/tenant: "{{.tenant.name}}"
+        platform.idp/environment: "{{.tenant.environment}}"
+        platform.idp/region: eu-west1
+        platform.idp/layer: workload
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/villadalmine/vcluster-idp.git
+        targetRevision: HEAD
+        path: charts/tenant
+        helm:
+          valuesObject:
+            externalAccess:
+              mode: gateway
+            postgres:
+              secretBackend: '{{ dig "tenant" "secretBackend" "generated" . }}'
+            tenant:
+              name: "{{.tenant.name}}"
+              environment: "{{.tenant.environment}}"
+              domain: "{{.tenant.domain}}"
+            applications:
+              api:
+                version: "{{.applications.api.version}}"
+              web:
+                version: "{{.applications.web.version}}"
+      destination:
+        name: "vcluster-{{.tenant.name}}-{{.tenant.environment}}"   # el cluster que registra el CronJob
+        namespace: "{{.tenant.name}}"
+      ignoreDifferences:
+        - kind: Secret
+          jsonPointers:
+            - /data
+      syncPolicy:
+        automated: { prune: true, selfHeal: true }
+        syncOptions:
+          - CreateNamespace=true
+          - RespectIgnoreDifferences=true
+          - SkipDryRunOnMissingResource=true
+        retry:
+          limit: 5
+          backoff: { duration: 10s, factor: 2, maxDuration: 5m }

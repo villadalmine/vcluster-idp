@@ -34,7 +34,7 @@ spec:
         chart: vcluster
         targetRevision: "0.35.0"
         helm:
-          releaseName: "{{.tenant.name}}-{{.tenant.environment}}"
+          releaseName: "vcluster-{{.tenant.name}}-{{.tenant.environment}}"   # release==ns==svc → server https://<vc>.<ns>:443 (lo que espera el registro)
       destination:
         server: https://kubernetes.default.svc          # el propio cluster regional
         namespace: "vcluster-{{.tenant.name}}-{{.tenant.environment}}"
