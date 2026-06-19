@@ -143,6 +143,7 @@ spec:
                               runStrategy: Always
                               template:
                                 spec:
+                                  architecture: amd64   # patched from HostCluster spec.nodeArch. KubeVirt defaults a VMI's arch to the control-plane arch (arm64 here), which makes it unschedulable on the amd64 target node — so we set it explicitly per host.
                                   evictionStrategy: External
                                   domain:
                                     cpu: { cores: 2 }
@@ -168,6 +169,7 @@ spec:
               - { type: FromCompositeFieldPath, fromFieldPath: spec.memory, toFieldPath: spec.forProvider.manifest.spec.template.spec.virtualMachineTemplate.spec.template.spec.domain.memory.guest }
               - { type: FromCompositeFieldPath, fromFieldPath: spec.nodeImage, toFieldPath: 'spec.forProvider.manifest.spec.template.spec.virtualMachineTemplate.spec.template.spec.volumes[0].containerDisk.image' }
               - { type: FromCompositeFieldPath, fromFieldPath: spec.vmNodeHostname, toFieldPath: 'spec.forProvider.manifest.spec.template.spec.virtualMachineTemplate.spec.template.spec.nodeSelector["kubernetes.io/hostname"]' }
+              - { type: FromCompositeFieldPath, fromFieldPath: spec.nodeArch, toFieldPath: spec.forProvider.manifest.spec.template.spec.virtualMachineTemplate.spec.template.spec.architecture }
 
           - name: machinedeployment
             base:
@@ -233,6 +235,7 @@ spec:
                               runStrategy: Always
                               template:
                                 spec:
+                                  architecture: amd64   # patched from HostCluster spec.nodeArch. KubeVirt defaults a VMI's arch to the control-plane arch (arm64 here), which makes it unschedulable on the amd64 target node — so we set it explicitly per host.
                                   evictionStrategy: External
                                   domain:
                                     cpu: { cores: 2 }
@@ -258,6 +261,7 @@ spec:
               - { type: FromCompositeFieldPath, fromFieldPath: spec.memory, toFieldPath: spec.forProvider.manifest.spec.template.spec.virtualMachineTemplate.spec.template.spec.domain.memory.guest }
               - { type: FromCompositeFieldPath, fromFieldPath: spec.nodeImage, toFieldPath: 'spec.forProvider.manifest.spec.template.spec.virtualMachineTemplate.spec.template.spec.volumes[0].containerDisk.image' }
               - { type: FromCompositeFieldPath, fromFieldPath: spec.vmNodeHostname, toFieldPath: 'spec.forProvider.manifest.spec.template.spec.virtualMachineTemplate.spec.template.spec.nodeSelector["kubernetes.io/hostname"]' }
+              - { type: FromCompositeFieldPath, fromFieldPath: spec.nodeArch, toFieldPath: spec.forProvider.manifest.spec.template.spec.virtualMachineTemplate.spec.template.spec.architecture }
 
           - name: md-bootstrap
             base:

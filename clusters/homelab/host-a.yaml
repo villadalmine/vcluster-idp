@@ -17,4 +17,5 @@ spec:
   cpuCores: 2
   memory: "4Gi"
   vmNodeHostname: srv-t7910
+  nodeArch: amd64            # srv-t7910 is x86_64; without this the VMI inherits the cluster's arm64 default and never schedules
   nodeImage: quay.io/capk/ubuntu-2404-container-disk:v1.31.0
