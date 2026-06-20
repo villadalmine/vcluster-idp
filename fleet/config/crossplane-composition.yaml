@@ -128,6 +128,16 @@ spec:
                 transforms: [{ type: string, string: { type: Format, fmt: "%s-control-plane" } }]
               - { type: FromCompositeFieldPath, fromFieldPath: spec.controlPlaneReplicas, toFieldPath: spec.forProvider.manifest.spec.replicas }
               - { type: FromCompositeFieldPath, fromFieldPath: spec.kubernetesVersion, toFieldPath: spec.forProvider.manifest.spec.version }
+              # Per-cluster kubeadm wait-control-plane timeout. Optional: when the XR does NOT set
+              # cpInitTimeout the patch is skipped, so other clusters' KCP renders byte-identical and the
+              # KCP controller does NOT roll their control plane. Slow boots (e.g. DataVolume-backed VMs on
+              # nested KubeVirt) can take >4m for the control plane to come up; the default 4m kubeadm
+              # timeout then fails init before upload-config/mark-control-plane/addons run. Set e.g. "10m0s"
+              # only on the clusters that need it.
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.cpInitTimeout
+                toFieldPath: spec.forProvider.manifest.spec.kubeadmConfigSpec.clusterConfiguration.apiServer.timeoutForControlPlane
+                policy: { fromFieldPath: Optional }
 
           - name: cp-machinetemplate
             base:

@@ -26,3 +26,7 @@ spec:
   cni: calico
   role: management
   region: eu-west1
+  # Boot lento: la VM de euw1 arranca de un DataVolume (Longhorn) sobre KubeVirt anidado y su
+  # control-plane tarda >4m en levantar. Sin esto, kubeadm hace timeout a los 4m en wait-control-plane
+  # y el init no completa upload-config/mark-control-plane/addons → CAPI queda en WaitingForKubeadmInit.
+  cpInitTimeout: "10m0s"
