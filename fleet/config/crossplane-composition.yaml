@@ -156,14 +156,20 @@ spec:
                           virtualMachineTemplate:
                             spec:
                               runStrategy: Always
-                              # CONTROL-PLANE en containerDisk (disco LOCAL efímero), NO Longhorn. Medido
-                              # dentro de la VM: el engine de Longhorn da ~4x menos banda secuencial (75 vs
-                              # 310 MiB/s) y bajo el I/O concurrente del arranque (etcd+apiserver+cm+sched+
-                              # kubelet+pulls sobre un SSD compartido) el control-plane tarda >10m en estar
-                              # ready → kubeadm hace timeout en wait-control-plane y el init no completa.
-                              # Local arranca <4m. etcd efímero, pero el cluster es recreable por GitOps.
-                              # El WORKER sí va en DataVolume-Longhorn (persistente, sin etcd). Ver
-                              # FLEET-HCI-STORAGE-NETWORKING.md.
+                              # Disco de la VM = DataVolume (CDI importa la cloud-image a un PVC de
+                              # Longhorn). CAPK prefija el nombre por-máquina (prefixDataVolumeTemplates),
+                              # así no colisionan entre réplicas. Reemplaza el containerDisk efímero de
+                              # 10Gi que daba disk-pressure. Ver FLEET-HCI-STORAGE-NETWORKING.md.
+                              dataVolumeTemplates:
+                                - metadata: { name: boot-volume }
+                                  spec:
+                                    pvc:
+                                      accessModes: [ReadWriteOnce]
+                                      resources: { requests: { storage: 30Gi } }
+                                      storageClassName: longhorn-vm
+                                    source:
+                                      registry:
+                                        url: "docker://quay.io/capk/ubuntu-2404-container-disk:v1.31.5"
                               template:
                                 spec:
                                   architecture: amd64   # patched from HostCluster spec.nodeArch (arch del VMI; KubeVirt defaultea a la del control-plane)
@@ -173,12 +179,11 @@ spec:
                                     memory: { guest: 4Gi }
                                     devices:
                                       disks:
-                                        - name: containervolume
+                                        - name: dv-volume
                                           disk: { bus: virtio }
                                   volumes:
-                                    - name: containervolume
-                                      containerDisk:
-                                        image: quay.io/capk/ubuntu-2404-container-disk:v1.31.5
+                                    - name: dv-volume
+                                      dataVolume: { name: boot-volume }
             patches:
               - type: FromCompositeFieldPath
                 fromFieldPath: metadata.name
@@ -190,8 +195,11 @@ spec:
                 transforms: [{ type: string, string: { type: Format, fmt: "%s-control-plane" } }]
               - { type: FromCompositeFieldPath, fromFieldPath: spec.cpuCores, toFieldPath: spec.forProvider.manifest.spec.template.spec.virtualMachineTemplate.spec.template.spec.domain.cpu.cores }
               - { type: FromCompositeFieldPath, fromFieldPath: spec.memory, toFieldPath: spec.forProvider.manifest.spec.template.spec.virtualMachineTemplate.spec.template.spec.domain.memory.guest }
-              # CP en containerDisk: nodeImage va al containerDisk.image (no a un dataVolumeTemplate). Sin diskSize: el containerDisk usa el tamaño de la imagen.
-              - { type: FromCompositeFieldPath, fromFieldPath: spec.nodeImage, toFieldPath: 'spec.forProvider.manifest.spec.template.spec.virtualMachineTemplate.spec.template.spec.volumes[0].containerDisk.image' }
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.nodeImage
+                toFieldPath: 'spec.forProvider.manifest.spec.template.spec.virtualMachineTemplate.spec.dataVolumeTemplates[0].spec.source.registry.url'
+                transforms: [{ type: string, string: { type: Format, fmt: "docker://%s" } }]
+              - { type: FromCompositeFieldPath, fromFieldPath: spec.diskSize, toFieldPath: 'spec.forProvider.manifest.spec.template.spec.virtualMachineTemplate.spec.dataVolumeTemplates[0].spec.pvc.resources.requests.storage' }
               - { type: FromCompositeFieldPath, fromFieldPath: spec.vmNodeHostname, toFieldPath: 'spec.forProvider.manifest.spec.template.spec.virtualMachineTemplate.spec.template.spec.nodeSelector["kubernetes.io/hostname"]' }
               - { type: FromCompositeFieldPath, fromFieldPath: spec.nodeArch, toFieldPath: spec.forProvider.manifest.spec.template.spec.virtualMachineTemplate.spec.template.spec.architecture }
 
