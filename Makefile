@@ -75,6 +75,12 @@ lint: ## Validate the repo YAML and the chart syntax
 	@command -v helm >/dev/null && helm lint charts/tenant || echo "helm not installed: validate in your environment"
 	@echo "✔ lint executed"
 
+.PHONY: validate
+validate: ## Run the E2E validation test catalog on the cluster (TENANT=... ENV=...)
+	@./cli/validate $(TENANT) $(ENV) $(FLAGS)
+
+
+
 .PHONY: template
 template: ## Render the tenant chart to stdout (debug)
 	@helm template $(TENANT) charts/tenant --set tenant.name=$(TENANT) --set tenant.environment=$(ENV)

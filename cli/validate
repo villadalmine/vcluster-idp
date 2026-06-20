@@ -73,6 +73,23 @@ sec "Req 6 — resource governance"
 vc kubectl get resourcequota "$TENANT-quota" -n "$VNS" >/dev/null 2>&1 && ok "ResourceQuota" || no "ResourceQuota"
 vc kubectl get limitrange "$TENANT-limits" -n "$VNS" >/dev/null 2>&1 && ok "LimitRange" || no "LimitRange"
 
+# ── Req 8 — secret backend (generated | eso, ADR-07) ────────────────────────
+BACKEND=$(awk '/^[[:space:]]*secretBackend:/{print $2; exit}' "tenants/$ENV/$TENANT.yaml" 2>/dev/null)
+BACKEND="${BACKEND:-generated}"
+sec "Req 8 — secret backend ($BACKEND)"
+if [ "$BACKEND" = "eso" ]; then
+  vc kubectl get deploy external-secrets -n external-secrets >/dev/null 2>&1 \
+    && ok "ESO installed inside the vCluster" || no "ESO installed inside the vCluster"
+  st=$(vc kubectl get externalsecret "$TENANT-postgres" -n "$VNS" \
+         -o jsonpath='{.status.conditions[0].status}' 2>/dev/null | tail -1)
+  [ "$st" = "True" ] && ok "ExternalSecret Ready=True (SecretSynced)" || no "ExternalSecret Ready" "${st:-not found}"
+  vc kubectl get secret "$TENANT-postgres" -n "$VNS" >/dev/null 2>&1 \
+    && ok "Secret materialized by ESO (password never in Git)" || no "Secret materialized by ESO"
+else
+  pw=$(vc kubectl get secret "$TENANT-postgres" -n "$VNS" -o jsonpath='{.data.password}' 2>/dev/null | tail -1)
+  [ -n "$pw" ] && ok "generated Secret present (randAlphaNum, never hardcoded)" || no "generated Secret"
+fi
+
 # ── Req 7 — network isolation ───────────────────────────────────────────────
 sec "Req 7 — network isolation"
 kubectl -n "$NS" get ciliumnetworkpolicy "$TENANT-isolation" >/dev/null 2>&1 \
