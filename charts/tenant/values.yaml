@@ -72,9 +72,10 @@ networkPolicy:
   enabled: true
 
 # Placement: pin tenant workloads to specific node(s).
-# TEST: pinned to the GPU node (srv-t7910: 32 cores / 256GB / 2 GPUs, 16GB VRAM).
-# For the portable deliverable, set nodeSelector to {} so the scheduler is free.
+# Default = {} (scheduler free). The tenant runs INSIDE a vCluster whose nodes are NOT the mgmt
+# hosts (e.g. regional clusters have host-<region>-* nodes, not srv-t7910), so a hardcoded host
+# pin leaves pods Pending. NOTE: an override of nodeSelector to {} does NOT clear a non-empty
+# default (Helm merges maps; {} is a no-op) — so the default itself must be empty.
 placement:
-  nodeSelector:
-    kubernetes.io/hostname: srv-t7910
+  nodeSelector: {}
   tolerations: []
