@@ -47,7 +47,9 @@ data:
   # Typha is disabled.
   typha_service_name: "none"
   # Configure the backend to use.
-  calico_backend: "bird"
+  # VXLAN (no BGP/IPIP): IPIP (proto-4) does NOT traverse the KubeVirt masquerade between the
+  # nested VMs, so cross-node pod traffic (and CoreDNS) was 100% dropped. VXLAN over UDP 4789 passes.
+  calico_backend: "vxlan"
 
   # Configure the MTU to use for workload interfaces and tunnels.
   # Auto-detection gives 1480 (1500-20 IPIP), but these are KubeVirt nested clusters: the VM's
@@ -6247,12 +6249,12 @@ spec:
             # Auto-detect the BGP IP address.
             - name: IP
               value: "autodetect"
-            # Enable IPIP
+            # IPIP disabled — does not traverse the nested KubeVirt masquerade. VXLAN instead.
             - name: CALICO_IPV4POOL_IPIP
-              value: "Always"
-            # Enable or Disable VXLAN on the default IP pool.
-            - name: CALICO_IPV4POOL_VXLAN
               value: "Never"
+            # VXLAN on the default IP pool (UDP 4789 survives the masquerade between VMs).
+            - name: CALICO_IPV4POOL_VXLAN
+              value: "Always"
             # Enable or Disable VXLAN on the default IPv6 IP pool.
             - name: CALICO_IPV6POOL_VXLAN
               value: "Never"
@@ -6306,7 +6308,6 @@ spec:
               command:
               - /bin/calico-node
               - -felix-live
-              - -bird-live
             periodSeconds: 10
             initialDelaySeconds: 10
             failureThreshold: 6
@@ -6316,7 +6317,6 @@ spec:
               command:
               - /bin/calico-node
               - -felix-ready
-              - -bird-ready
             periodSeconds: 10
             timeoutSeconds: 10
           volumeMounts:
