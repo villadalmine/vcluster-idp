@@ -1,13 +1,19 @@
-# ApplicationSet que corre en el ArgoCD del CLUSTER REGIONAL eu-west1 (sembrado por el
-# region-root del HelmChartProxy). Lee los tenants de ESTA región y provisiona un vCluster por
-# tenant EN ESTE cluster (destination = kubernetes.default.svc = el regional). Es el mismo
-# patrón que applicationsets/hosts-appset.yaml del management, pero scopeado a la región y
-# corriendo en el ArgoCD del regional (no en el del management). Así el management no deploya
-# tenants: cada cluster regional despliega los suyos.
+# BASE COMPARTIDA (parametrizable por región). El overlay de cada región
+# (clusters/regions/<region>/apps/kustomization.yaml) parchea el token REGION → <region> en:
+#   - metadata.name        (vclusters-<region>)
+#   - el path del generador (clusters/regions/<region>/tenants/**/*.yaml)
+#   - el label platform.idp/region
+# Así agregar una región = 1 overlay chico, sin duplicar este appset. Ver clusters/regions/README.md
+#
+# ApplicationSet que corre en el ArgoCD del CLUSTER REGIONAL (sembrado por el region-root del
+# HelmChartProxy). Lee los tenants de ESTA región y provisiona un vCluster por tenant EN ESTE
+# cluster (destination = kubernetes.default.svc = el regional). Es el mismo patrón que
+# applicationsets/hosts-appset.yaml del management, pero scopeado a la región y corriendo en el
+# ArgoCD del regional. Así el management no deploya tenants: cada cluster regional despliega los suyos.
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
-  name: vclusters-eu-west1
+  name: vclusters-REGION
   namespace: argocd
 spec:
   goTemplate: true
@@ -17,7 +23,7 @@ spec:
         repoURL: https://github.com/villadalmine/vcluster-idp.git
         revision: HEAD
         files:
-          - path: "clusters/regions/eu-west1/tenants/**/*.yaml"
+          - path: "clusters/regions/REGION/tenants/**/*.yaml"
         requeueAfterSeconds: 30
   template:
     metadata:
@@ -25,7 +31,7 @@ spec:
       labels:
         platform.idp/tenant: "{{.tenant.name}}"
         platform.idp/environment: "{{.tenant.environment}}"
-        platform.idp/region: eu-west1
+        platform.idp/region: REGION
         platform.idp/layer: vcluster
     spec:
       project: default

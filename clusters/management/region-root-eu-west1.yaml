@@ -1,8 +1,9 @@
-# El "region-root" de eu-west1: un app-of-apps que se SIEMBRA dentro del ArgoCD del cluster
-# regional (no se aplica en el management). Apunta a clusters/regions/eu-west1/apps -> ahí está
-# el ApplicationSet que provisiona los vCluster de los tenants de la región, en el propio cluster.
-# Este archivo NO se aplica directo: kustomize lo empaqueta en el ConfigMap region-root-eu-west1
-# y el ClusterResourceSet lo inyecta en el cluster con label platform.idp/region=eu-west1.
+# El "region-root" de eu-west1: app-of-apps que se SIEMBRA en el ArgoCD del cluster regional
+# (no se aplica en el management). Apunta DIRECTO a la base COMPARTIDA clusters/regions/_base y le
+# setea la región con kustomize.patches (REGION → eu-west1). Es la ÚNICA pieza por-región: agregar
+# una región = copiar este archivo cambiando "eu-west1". Ver clusters/regions/README.md
+# NO se aplica directo: kustomize lo empaqueta en el ConfigMap region-root-eu-west1 y el
+# ClusterResourceSet lo inyecta en el cluster con label platform.idp/region=eu-west1.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -13,9 +14,19 @@ spec:
   source:
     repoURL: https://github.com/villadalmine/vcluster-idp.git
     targetRevision: HEAD
-    path: clusters/regions/eu-west1/apps
-    directory:
-      recurse: true
+    path: clusters/regions/_base          # base compartida; la región la pone el patch de abajo
+    kustomize:
+      patches:
+        - target: { group: argoproj.io, kind: ApplicationSet, name: vclusters-REGION }
+          patch: |-
+            - { op: replace, path: /metadata/name, value: vclusters-eu-west1 }
+            - { op: replace, path: /spec/generators/0/git/files/0/path, value: "clusters/regions/eu-west1/tenants/**/*.yaml" }
+            - { op: replace, path: /spec/template/metadata/labels/platform.idp~1region, value: eu-west1 }
+        - target: { group: argoproj.io, kind: ApplicationSet, name: workloads-REGION }
+          patch: |-
+            - { op: replace, path: /metadata/name, value: workloads-eu-west1 }
+            - { op: replace, path: /spec/generators/0/git/files/0/path, value: "clusters/regions/eu-west1/tenants/**/*.yaml" }
+            - { op: replace, path: /spec/template/metadata/labels/platform.idp~1region, value: eu-west1 }
   destination:
     server: https://kubernetes.default.svc   # el propio cluster regional
     namespace: argocd
