@@ -34,6 +34,11 @@ spec:
         path: charts/tenant
         helm:
           valuesObject:
+            # El tenant corre DENTRO del vCluster del cluster regional (nodos host-<region>-*), NO en
+            # el management. El default del chart pinea a srv-t7910 (test GPU) → acá los pods quedarían
+            # Pending. Liberamos el scheduler para la región (scoped, no toca el chart ni los tenants mgmt).
+            placement:
+              nodeSelector: {}
             externalAccess:
               mode: gateway
             postgres:
