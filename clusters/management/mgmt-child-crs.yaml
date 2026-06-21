@@ -1,0 +1,17 @@
+# Siembra los manifests del cluster HIJO en host-mgmt (role=management) — la versión GitOps del apply a
+# mano. El CRS inyecta el ConfigMap mgmt-child-cluster (generado de mgmt-child-cluster.yaml) → el CAPK de
+# host-mgmt lo procesa y crea las VMs del hijo en el KubeVirt del Root (vía el secret mgmt-child-infra
+# que crea el CronJob mgmt-child-infra). ApplyOnce, reintenta hasta que existan los CRDs de CAPI en host-mgmt.
+apiVersion: addons.cluster.x-k8s.io/v1beta1
+kind: ClusterResourceSet
+metadata:
+  name: mgmt-child
+  namespace: fleet
+spec:
+  clusterSelector:
+    matchLabels:
+      platform.idp/role: management
+  strategy: ApplyOnce
+  resources:
+    - name: mgmt-child-cluster
+      kind: ConfigMap

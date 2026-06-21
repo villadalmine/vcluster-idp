@@ -12,9 +12,15 @@ resources:
   - helmchartproxy-certmanager.yaml   # CAAPH → cert-manager en role=management (prereq del CAPI operator)
   - helmchartproxy-capi.yaml          # CAAPH → CAPI en role=management (Fase 2: host-mgmt crea clusters)
   - region-root-crs.yaml
+  - mgmt-child-rbac.yaml              # Fase 2: SA+RBAC en el Root para el external-infra del CAPK de host-mgmt
+  - mgmt-child-infra-job.yaml         # Fase 2: CronJob que crea el secret kubeconfig en host-mgmt (credencial)
+  - mgmt-child-crs.yaml               # Fase 2: siembra los manifests del child en host-mgmt
 configMapGenerator:
   - name: region-root-eu-west1
     files:
       - region-root-eu-west1.yaml
+  - name: mgmt-child-cluster          # los manifests del child (los aplica el CRS en host-mgmt, NO en el Root)
+    files:
+      - mgmt-child-cluster.yaml
 generatorOptions:
   disableNameSuffixHash: true   # el CRS referencia el ConfigMap por nombre exacto

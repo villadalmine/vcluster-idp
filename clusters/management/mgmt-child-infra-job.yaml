@@ -1,0 +1,70 @@
+# Fase 2 GitOps — genera la credencial external-infra SIN tocar nada a mano (reemplaza el secret que
+# creé manualmente). CronJob declarativo (patrón vcluster-register): arma el kubeconfig al Root desde el
+# token del SA capk-mgmt-child (in-cluster, nunca en git) y crea el secret mgmt-child-infra DENTRO de
+# host-mgmt. Idempotente + reintenta (espera a que existan el host-mgmt-kubeconfig y el token). Corre en
+# el Root (lo aplica fleet-management). El CAPK de host-mgmt usa ese secret para crear las VMs del hijo
+# en el KubeVirt del Root.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: mgmt-child-infra
+  namespace: fleet
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: mgmt-child-infra
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list"]    # leer capk-mgmt-child-token (mgmt-child) + host-mgmt-kubeconfig (fleet)
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: mgmt-child-infra
+roleRef: { apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: mgmt-child-infra }
+subjects:
+  - { kind: ServiceAccount, name: mgmt-child-infra, namespace: fleet }
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: mgmt-child-infra
+  namespace: fleet
+spec:
+  schedule: "*/10 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        spec:
+          serviceAccountName: mgmt-child-infra
+          restartPolicy: Never
+          containers:
+            - name: gen
+              image: alpine/k8s:1.31.5
+              command: ["/bin/bash", "-c"]
+              args:
+                - |
+                  set -eu
+                  ROOT_API="https://192.168.178.130:6443"   # API del Root reachable desde host-mgmt (VIP HAProxy)
+                  TOK="$(kubectl -n mgmt-child get secret capk-mgmt-child-token -o jsonpath='{.data.token}' 2>/dev/null | base64 -d || true)"
+                  CA="$(kubectl -n mgmt-child get secret capk-mgmt-child-token -o jsonpath='{.data.ca\.crt}' 2>/dev/null || true)"
+                  HM="$(kubectl -n fleet get secret host-mgmt-kubeconfig -o jsonpath='{.data.value}' 2>/dev/null | base64 -d || true)"
+                  [ -n "$TOK" ] && [ -n "$CA" ] && [ -n "$HM" ] || { echo "esperando token/host-mgmt-kubeconfig..."; exit 0; }
+                  cat > /tmp/infra.kc <<EOF
+                  apiVersion: v1
+                  kind: Config
+                  clusters: [{name: root, cluster: {server: ${ROOT_API}, certificate-authority-data: ${CA}}}]
+                  contexts: [{name: c, context: {cluster: root, user: u, namespace: mgmt-child}}]
+                  current-context: c
+                  users: [{name: u, user: {token: ${TOK}}}]
+                  EOF
+                  printf '%s' "$HM" > /tmp/hm.kc
+                  KUBECONFIG=/tmp/hm.kc kubectl create secret generic mgmt-child-infra -n default \
+                    --from-file=kubeconfig=/tmp/infra.kc --dry-run=client -o yaml | KUBECONFIG=/tmp/hm.kc kubectl apply -f -
+                  echo "secret mgmt-child-infra creado/actualizado en host-mgmt"
