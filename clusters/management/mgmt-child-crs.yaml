@@ -11,7 +11,7 @@ spec:
   clusterSelector:
     matchLabels:
       platform.idp/role: management
-  strategy: ApplyOnce
+  strategy: Reconcile   # git = fuente continua (p.ej. el label cni del Cluster propaga sin recrear)
   resources:
     - name: mgmt-child-cluster
       kind: ConfigMap

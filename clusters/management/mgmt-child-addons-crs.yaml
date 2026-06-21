@@ -11,7 +11,7 @@ spec:
   clusterSelector:
     matchLabels:
       platform.idp/role: management
-  strategy: ApplyOnce
+  strategy: Reconcile   # git = fuente continua: cambios en el bundle (p.ej. agregar child-cni) propagan al host-mgmt
   resources:
     - name: mgmt-child-addons
       kind: ConfigMap
