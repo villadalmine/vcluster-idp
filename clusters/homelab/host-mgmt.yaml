@@ -1,0 +1,28 @@
+# Host cluster host-mgmt → management-child (region eu-central1). Rebuild con calico-vxlan.
+# Antes era cilium: el worker nunca joineó (NotReady) y el único CP queda con taint → el ArgoCD que
+# instala CAAPH no podía schedular (redis-init Pending 25h). VXLAN arregla el join cross-VM. Demuestra
+# el modelo "management-child": un host promovido a management con su PROPIO ArgoCD + region-root.
+apiVersion: fleet.homelab.io/v1alpha1
+kind: HostCluster
+metadata:
+  name: host-mgmt
+  namespace: fleet
+  labels:
+    env: dev
+    region: eu-central1
+spec:
+  crossplane:
+    compositionRef:
+      name: hostcluster-kubevirt
+  kubernetesVersion: v1.31.5
+  controlPlaneReplicas: 1
+  workerReplicas: 1
+  cpuCores: 2
+  memory: "4Gi"
+  vmNodeHostname: srv-t7910
+  nodeArch: amd64
+  nodeImage: quay.io/capk/ubuntu-2404-container-disk:v1.31.5
+  cni: calico-vxlan
+  role: management
+  region: eu-central1
+  cpInitTimeout: "15m0s"
