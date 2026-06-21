@@ -15,57 +15,6 @@
 apiVersion: cluster.x-k8s.io/v1beta1
 kind: MachineHealthCheck
 metadata:
-  name: host-a-workers
-  namespace: fleet
-spec:
-  clusterName: host-a
-  selector:
-    matchLabels:
-      cluster.x-k8s.io/cluster-name: host-a
-    matchExpressions:
-      - { key: cluster.x-k8s.io/control-plane, operator: DoesNotExist }
-  nodeStartupTimeout: 25m
-  unhealthyConditions:
-    - { type: Ready, status: Unknown, timeout: 900s }
-    - { type: Ready, status: "False", timeout: 900s }
----
-apiVersion: cluster.x-k8s.io/v1beta1
-kind: MachineHealthCheck
-metadata:
-  name: host-b-workers
-  namespace: fleet
-spec:
-  clusterName: host-b
-  selector:
-    matchLabels:
-      cluster.x-k8s.io/cluster-name: host-b
-    matchExpressions:
-      - { key: cluster.x-k8s.io/control-plane, operator: DoesNotExist }
-  nodeStartupTimeout: 25m
-  unhealthyConditions:
-    - { type: Ready, status: Unknown, timeout: 900s }
-    - { type: Ready, status: "False", timeout: 900s }
----
-apiVersion: cluster.x-k8s.io/v1beta1
-kind: MachineHealthCheck
-metadata:
-  name: host-c-workers
-  namespace: fleet
-spec:
-  clusterName: host-c
-  selector:
-    matchLabels:
-      cluster.x-k8s.io/cluster-name: host-c
-    matchExpressions:
-      - { key: cluster.x-k8s.io/control-plane, operator: DoesNotExist }
-  nodeStartupTimeout: 25m
-  unhealthyConditions:
-    - { type: Ready, status: Unknown, timeout: 900s }
-    - { type: Ready, status: "False", timeout: 900s }
----
-apiVersion: cluster.x-k8s.io/v1beta1
-kind: MachineHealthCheck
-metadata:
   name: host-euw1-workers
   namespace: fleet
 spec:

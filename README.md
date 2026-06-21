@@ -389,7 +389,7 @@ Platform Topology & vCluster Models Showcase (read-only, live)
 ═══════════════════════════════════════════════════════════════════════════
  3. Each host runs its OWN ArgoCD + its OWN vClusters (MODELS 3 & 4)
 ═══════════════════════════════════════════════════════════════════════════
- ℹ️ Concept: Decentralized GitOps: the management ArgoCD only creates clusters; each created host (role=management) gets its own ArgoCD (via CAAPH) seeded with a region-root, and provisions ITS region's vClusters locally — no central SPOF. A host promoted to management is the 'management-child' rung.
+ ℹ️ Concept: Decentralized GitOps: the management ArgoCD only creates clusters; each created REGIONAL host (role=regional) gets its own ArgoCD (via CAAPH) seeded with a region-root, and provisions ITS region's vClusters locally — no central SPOF. A management-role host (host-mgmt) NEVER hosts tenants itself: it CREATES a regional child (mgmt-child, role=regional) — the 'management-child' rung — and THAT child hosts them. (management = creates clusters; regional = hosts tenant vClusters.)
 
   • Management-role clusters (each runs its own ArgoCD):
       host-mgmt (region=none) → local ArgoCD apps: 1
