@@ -33,7 +33,7 @@ Use these links to navigate directly to the code implementing each component of 
 ### 3. CLI Automation & Scripts
 *   **Platform Lifecycle Facade**: [`cli/platform`](./cli/platform) (implements `platform <tenant> <create|delete|status>`).
 *   **ArgoCD vCluster Join**: [`cli/register-vcluster`](./cli/register-vcluster) (automatically registers the vCluster context in ArgoCD).
-*   **E2E Validation Catalog**: [`cli/validate`](./cli/validate) (automates the 27 functional checks verifying every PDF requirement).
+*   **E2E Validation Catalog**: [`cli/validate`](./cli/validate) (automates the 27 functional checks verifying every platform requirement).
 *   **Multicluster Query Tool**: [`cli/fleet-test`](./cli/fleet-test) (routes kubectl queries to nested VM host clusters).
 
 ### 4. Advanced Fleet & Infrastructure Definitions
@@ -567,7 +567,7 @@ cluster down at once. That is a real **single point of failure**, and it is wort
 
 ---
 
-## 4. How the PDF Requirements Map to Code
+## 4. How the Requirements Map to Code
 
 ### Dedicated Namespace & vCluster (Req 1, 3)
 *   The virtual cluster control plane is spawned on the host inside `vcluster-<tenant>-<env>` via [`hosts-appset.yaml`](./applicationsets/hosts-appset.yaml) using the configuration in [`vcluster/shared-nodes.yaml`](./vcluster/shared-nodes.yaml).
@@ -589,6 +589,14 @@ cluster down at once. That is a real **single point of failure**, and it is wort
 
 ### External Access & TLS (Req 12)
 *   Gateway and HTTPRoute definitions terminate TLS on the host in [`routes-appset.yaml`](./applicationsets/routes-appset.yaml), targeting the virtual services. TLS certs are issued by cert-manager gateway-shim.
+
+### Tenant Lifecycle — create / delete / status (Req 2)
+*   `cli/platform <tenant> create|delete|status` is a **GitOps facade**, not an imperative deployer: `create`/`delete` write or remove `tenants/<env>/<tenant>.yaml` (or `clusters/regions/<region>/tenants/...` for a regional tenant) and commit; ArgoCD then reconciles on `create` and **prunes** on `delete`. See [`cli/platform`](./cli/platform).
+
+### Reliability — Idempotency, Failure Handling & Drift (Req 9, 10, 11)
+*   **Idempotency (Req 9)**: re-running `create` overwrites the **same one-file desired state**, so ArgoCD converges to it and never creates duplicates; `delete` on a missing tenant is a no-op. There is no imperative `kubectl apply` that could double-apply.
+*   **Failure Handling (Req 10)**: provisioning is ordered by **sync waves** (Namespace → Quota/Policies → Secret → PostgreSQL → Apps); ArgoCD holds a wave until the previous one is Healthy (the apps do not deploy until Postgres reports healthy) and **retries with backoff**. A partial failure leaves a known, self-correcting state — not half-applied imperative resources (ADR-08).
+*   **Drift Detection (Req 11)**: ArgoCD `selfHeal` continuously compares live state vs Git. If the vCluster is deleted while the Namespace/Postgres still exist, ArgoCD detects the drift and **recreates only the missing piece** to match Git (`prune` removes anything extra). Running `platform tenant-a create` again simply re-asserts the same desired state — see `selfHeal`/`prune` in [`applicationsets/tenants-appset.yaml`](./applicationsets/tenants-appset.yaml).
 
 ---
 
@@ -681,5 +689,6 @@ Our platform is architected to scale out using a multi-cluster fleet design rath
 | **RBAC** | **R**ole-**B**ased **A**ccess **C**ontrol | Kubernetes authorization (roles + bindings). |
 | **SSA** | **S**erver-**S**ide **A**pply | Field-managed apply; re-applying identical specs is a no-op. |
 | **LGTM** | **L**oki **G**rafana **T**empo **M**imir | The (designed) centralized observability stack. |
-| **DQ** | **D**esign **Q**uestion | The take-home design questions answered in §5. |
+| **DQ** | **D**esign **Q**uestion | One of the **7 questions the requirements ask** to be answered in the README (scaling, app lifecycle, GitOps, version management, external access, security, tenant k8s access) — each answered in §5. *These are what the brief asks.* |
+| **ADR** | **A**rchitecture **D**ecision **R**ecord | A short note of **a design decision we made** + its rationale and trade-off (e.g. decentralized GitOps, Gateway persona split, sync waves). The key ones are listed in §3. *These are what we decided — distinct from the DQs, which are what's asked.* |
 
