@@ -19,7 +19,14 @@
 set -uo pipefail
 NS=fleet
 IMG=alpine/k8s:1.31.0
-ALL="host-a host-b host-c host-mgmt host-euw1"
+
+# Clusters DESCUBIERTOS dinámicamente (cero hardcode): cada host/workload cluster alcanzable expone su
+# admin kubeconfig como secret "<cluster>-kubeconfig" en el ns del management — CAPI lo crea para los
+# que gestiona el Root, y el rung recursivo (mgmt-child) lo deja copiado ahí. Si agregás o quitás un
+# cluster, el tool lo sigue solo. ALL se computa al arrancar (antes del dispatch).
+discover_clusters() {
+  kubectl -n "$NS" get secret -o name 2>/dev/null | sed -n 's@^secret/\(.*\)-kubeconfig$@\1@p' | sort -u
+}
 
 c0() { printf "\033[%sm%s\033[0m" "$1" "$2"; }
 hdr(){ echo; echo "$(c0 '1;36' "══ $* ══")"; }
@@ -31,7 +38,11 @@ warn(){ echo "  $(c0 '1;33' '⚠') $*"; }
 ensure_jump() { # idempotente: crea el jump pod si no está
   local c=$1
   kubectl -n $NS get secret "${c}-kubeconfig" >/dev/null 2>&1 || { warn "$c: sin kubeconfig (¿existe el cluster?)"; return 1; }
-  if ! kubectl -n $NS get pod "jump-$c" >/dev/null 2>&1; then
+  # Recrear si el pod NO está Running: el `sleep` expira y el pod queda Completed; el reuse-by-name
+  # anterior lo veía "presente" y nunca lo recreaba → el wait Ready colgaba y check fallaba en silencio.
+  local phase; phase=$(kubectl -n $NS get pod "jump-$c" -o jsonpath='{.status.phase}' 2>/dev/null)
+  if [ "$phase" != "Running" ]; then
+    kubectl -n $NS delete pod "jump-$c" --ignore-not-found >/dev/null 2>&1
     kubectl -n $NS apply -f - >/dev/null 2>&1 <<EOF
 apiVersion: v1
 kind: Pod
@@ -42,7 +53,7 @@ spec:
   containers: [{ name: p, image: $IMG, command: ["sleep","7200"], volumeMounts: [{ name: kc, mountPath: /kc }] }]
 EOF
   fi
-  kubectl -n $NS wait --for=condition=Ready "pod/jump-$c" --timeout=90s >/dev/null 2>&1
+  kubectl -n $NS wait --for=condition=Ready "pod/jump-$c" --timeout=120s >/dev/null 2>&1
 }
 
 kc() {
@@ -76,10 +87,16 @@ check() {
   local c=$1
   hdr "CLUSTER $c"
   ensure_jump "$c" || return
-  # capa CAPI (mgmt-side)
-  local phase=$(kubectl -n $NS get cluster "$c" -o jsonpath='{.status.phase}' 2>/dev/null)
-  local cpr=$(kubectl -n $NS get cluster "$c" -o jsonpath='{.status.controlPlaneReady}' 2>/dev/null)
-  [ "$cpr" = "true" ] && ok "CAPI: phase=$phase controlPlaneReady=true" || no "CAPI: phase=$phase controlPlaneReady=$cpr"
+  # capa CAPI (mgmt-side) — puede no existir si el Root no lo gestiona (ej. mgmt-child, rung recursivo:
+  # lo alcanzamos por su kubeconfig pero no es un Cluster CAPI del Root).
+  if kubectl -n $NS get cluster "$c" >/dev/null 2>&1; then
+    local phase cpr
+    phase=$(kubectl -n $NS get cluster "$c" -o jsonpath='{.status.phase}' 2>/dev/null)
+    cpr=$(kubectl -n $NS get cluster "$c" -o jsonpath='{.status.controlPlaneReady}' 2>/dev/null)
+    [ "$cpr" = "true" ] && ok "CAPI: phase=$phase controlPlaneReady=true" || no "CAPI: phase=$phase controlPlaneReady=$cpr"
+  else
+    inf "CAPI: n/a (no es un Cluster del Root — alcanzado por su kubeconfig)"
+  fi
   # nodos
   local nodes ready
   nodes=$(kc "$c" get nodes --no-headers 2>/dev/null); ready=$(echo "$nodes" | grep -cw Ready)
@@ -91,16 +108,23 @@ check() {
   local d; d=$(dns_test "$c"); [ "$d" = "OK" ] && ok "DNS cross-node (MTU): OK" || no "DNS cross-node: $d  ← revisar MTU (FLEET-KUBEVIRT-NETWORKING.md)"
   # StorageClass
   local sc; sc=$(kc "$c" get storageclass --no-headers 2>/dev/null | grep -c .); [ "$sc" -ge 1 ] && ok "StorageClass: $sc" || warn "StorageClass: ninguna (PVCs quedan Pending)"
-  # ArgoCD (si role=management)
-  local role; role=$(kubectl -n $NS get hostcluster "$c" -o jsonpath='{.spec.role}' 2>/dev/null)
-  if [ "$role" = "management" ]; then
-    local apps; apps=$(kc "$c" -n argocd get applications --no-headers 2>/dev/null | grep -c .)
-    [ "$apps" -ge 1 ] && ok "ArgoCD propio: $apps apps" || warn "ArgoCD: sin apps (¿region-root sembrado?)"
-    kc "$c" -n argocd get applications --no-headers 2>/dev/null | grep -iv 'Synced.*Healthy' | sed 's/^/      ⚠ /' | head
-    # vClusters
-    local vcs; vcs=$(kc "$c" get ns --no-headers 2>/dev/null | grep -c '^vcluster-')
-    [ "$vcs" -ge 1 ] && ok "vClusters: $vcs" || inf "vClusters: 0 (aún)"
+  # ArgoCD propio — PROBE por presencia real de apps (sin gatear por role): cuenta filas Synced/OutOfSync,
+  # así no cuenta líneas de error si no hay ns argocd. Lo corren los regional Y los management.
+  local apps; apps=$(kc "$c" -n argocd get applications --no-headers 2>/dev/null | grep -cE 'Synced|OutOfSync')
+  if [ "${apps:-0}" -ge 1 ]; then
+    ok "ArgoCD propio: $apps apps"
+    kc "$c" -n argocd get applications --no-headers 2>/dev/null | grep -E 'Synced|OutOfSync' | grep -iv 'Synced.*Healthy' | sed 's/^/      ⚠ /' | head
+  else
+    inf "ArgoCD: sin apps propias (cluster sin GitOps descentralizado)"
+  fi
+  # vClusters — PROBE por namespaces vcluster-* (sin gatear por role): los hospedan los role=regional;
+  # un management correctamente devuelve 0 (no hospeda tenants).
+  local vcs; vcs=$(kc "$c" get ns --no-headers 2>/dev/null | grep -c '^vcluster-')
+  if [ "${vcs:-0}" -ge 1 ]; then
+    ok "vClusters: $vcs"
     kc "$c" get pods -A --no-headers 2>/dev/null | grep vcluster- | awk '{print "      vc:",$2,$4}' | head
+  else
+    inf "vClusters: 0 (este cluster no hospeda tenants)"
   fi
 }
 
@@ -108,17 +132,19 @@ list_vclusters() {
   hdr "TODOS los vClusters del fleet"
   local c
   for c in $ALL; do
-    local role; role=$(kubectl -n $NS get hostcluster "$c" -o jsonpath='{.spec.role}' 2>/dev/null)
-    [ "$role" = "management" ] || continue
     ensure_jump "$c" >/dev/null 2>&1 || continue
+    local out; out=$(kc "$c" get ns --no-headers 2>/dev/null | grep '^vcluster-')
+    [ -n "$out" ] || continue            # sólo muestra clusters que REALMENTE hospedan vClusters
     echo "  [$c]"
-    kc "$c" get ns --no-headers 2>/dev/null | grep '^vcluster-' | awk '{print "    -",$1,"("$2")"}' || echo "    (ninguno)"
+    echo "$out" | awk '{print "    -",$1,"("$2")"}'
   done
 }
 
-clean() { kubectl -n $NS delete pod -l app=fleet-test-jump --ignore-not-found 2>&1; for c in $ALL; do kc "$c" -n default delete pod fleet-dnstest --ignore-not-found >/dev/null 2>&1; done; echo "limpio."; }
+clean() { kubectl -n $NS delete pod -l app=fleet-test-jump --ignore-not-found 2>&1; echo "jump pods borrados (los fleet-dnstest se recrean limpios en el próximo dns test)."; }
 
 cmd=${1:-demo}; shift || true
+ALL="$(discover_clusters)"
+[ -z "$ALL" ] && { warn "no encontré secrets *-kubeconfig en ns $NS (¿hay clusters creados?)"; exit 1; }
 case "$cmd" in
   check)   t=${1:-all}; if [ "$t" = all ]; then for c in $ALL; do check "$c"; done; else check "$t"; fi ;;
   vclusters) list_vclusters ;;
