@@ -103,21 +103,29 @@ kubectl -n fleet get hostcluster -o custom-columns='NAME:.metadata.name,CNI:.spe
 ok "CNI is a per-cluster field; multi-VM clusters standardized on calico-vxlan after the experiment."
 
 # ── 6. Management-of-managements: host-mgmt CREATES its own child cluster ────
-sec "6. Management-of-managements: host-mgmt CREATES its own child (MODEL 6)" \
-    "host-mgmt is not just a workload host — it runs FULL CAPI and creates ITS OWN host cluster (mgmt-child). The child's VMs run on the Root's KubeVirt via CAPK external-infra (the only KVM node). Recursive fleet: a management cluster spawning more clusters, all GitOps."
+sec "6. Recursion: host-mgmt creates a child AND gives it its OWN stack (MODEL 6)" \
+    "host-mgmt is not just a workload host — it runs FULL CAPI+CAAPH and creates ITS OWN host cluster (mgmt-child), then delivers it the SAME stack the Root gives its regionals (ArgoCD + region-root + CNI), one rung down. mgmt-child ends up decentralized (own ArgoCD, no SPOF) hosting its own tenant vCluster. Whole chain validated CLEAN-ROOM (deleted everything, rebuilt from git)."
 
-info "host-mgmt runs CAPI (it IS a management cluster — providers Ready):"
-$FT kc host-mgmt get coreprovider,bootstrapprovider,controlplaneprovider,infrastructureprovider -A --no-headers 2>/dev/null | awk '{print "      "$2,"ready="$4}' | head
+info "host-mgmt runs CAPI + CAAPH (providers Ready — incl. addon=helm, so it installs ArgoCD on its OWN children):"
+$FT kc host-mgmt get coreprovider,bootstrapprovider,controlplaneprovider,infrastructureprovider,addonprovider -A --no-headers 2>/dev/null | awk '{print "      "$2,"ready="$4}' | head
 echo
-info "host-mgmt CREATED a child cluster (mgmt-child):"
+info "host-mgmt CREATED a child cluster (mgmt-child); its VMs run on the ROOT's KubeVirt (via external-infra):"
 $FT kc host-mgmt get cluster -A --no-headers 2>/dev/null | sed 's/^/      /'
+kubectl -n mgmt-child get vmi -o custom-columns='VM:.metadata.name,IP:.status.interfaces[0].ipAddress,STATUS:.status.phase' --no-headers 2>/dev/null | sed 's/^/      /'
 echo
-info "the child's VMs run on the ROOT's KubeVirt (namespace mgmt-child, via external-infra):"
-kubectl -n mgmt-child get vmi -o custom-columns='VM:.metadata.name,IP:.status.interfaces[0].ipAddress,NODE:.spec.nodeName,STATUS:.status.phase' --no-headers 2>/dev/null | sed 's/^/      /'
-ok "host-mgmt → creates mgmt-child → its VMs land on the Root's KubeVirt. Management-of-managements."
+# reach the grandchild: refresh its kubeconfig (from host-mgmt) into fleet so the jump pod can read it (ClusterIP changes per rebuild)
+$FT kc host-mgmt -n default get secret mgmt-child-kubeconfig -o jsonpath='{.data.value}' 2>/dev/null | base64 -d > /tmp/.mc.kc 2>/dev/null || true
+[ -s /tmp/.mc.kc ] && kubectl -n fleet create secret generic mgmt-child-kubeconfig --from-file=value=/tmp/.mc.kc --dry-run=client -o yaml 2>/dev/null | kubectl apply -f - >/dev/null 2>&1
+info "RECURSION: mgmt-child got its OWN ArgoCD + region-root FROM host-mgmt (decentralized, no central SPOF):"
+echo "      ArgoCD pods Running on mgmt-child: $($FT kc mgmt-child -n argocd get pods --no-headers 2>/dev/null | grep -c Running)"
+$FT kc mgmt-child -n argocd get applications --no-headers 2>/dev/null | awk '{print "      app: "$1" "$2" "$3}'
+echo
+info "and mgmt-child hosts its OWN tenant vCluster (the recursion's leaf — pg/api/web run INSIDE it):"
+$FT kc mgmt-child get ns --no-headers 2>/dev/null | awk '$1 ~ /^vcluster-tenant-/{print "      • " $1}'
+ok "Root → host-mgmt (mgmt) → mgmt-child (regional, OWN ArgoCD) → vcluster-tenant-z. Full recursion, 100% GitOps (clean-room rebuilt)."
 
 echo
 echo -e "${c_green}${c_bold}✔ TOPOLOGY & MODELS SHOWCASE COMPLETE${c_reset}"
 echo "Same homelab, every model: hypervisor+host (1), mgmt creates clusters (2), decentralized"
-echo "regional ArgoCD (3,4), HA + CNI variants (5), and management-of-managements (6: host-mgmt → child)."
+echo "regional ArgoCD (3,4), HA + CNI variants (5), and RECURSION (6: host-mgmt → mgmt-child w/ own ArgoCD → vcluster)."
 echo
