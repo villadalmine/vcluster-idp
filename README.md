@@ -35,7 +35,7 @@ Use these links to navigate directly to the code implementing each component of 
 *   **Multicluster Query Tool**: [`cli/fleet-test`](./cli/fleet-test) (routes kubectl queries to nested VM host clusters).
 
 ### 4. Advanced Fleet & Infrastructure Definitions
-*   **Cluster API (CAPI) VM Host Clusters**: [`clusters/homelab/`](./clusters/homelab/) (defines the CAPK/KubeVirt virtual machine host clusters: `host-a.yaml`, `host-b.yaml`, `host-c.yaml`, `host-euw1.yaml`).
+*   **Cluster API (CAPI) VM Host Clusters**: [`clusters/homelab/`](./clusters/homelab/) (defines the CAPK/KubeVirt virtual machine host clusters: `host-euw1.yaml` regional, `host-mgmt.yaml` management).
 *   **Crossplane v2 Composition & XRD**: [`fleet/config/`](./fleet/config/) (defines infrastructure composition layers):
     *   [`crossplane-xrd.yaml`](./fleet/config/crossplane-xrd.yaml) — defines the custom `HostCluster` resource API.
     *   [`crossplane-composition.yaml`](./fleet/config/crossplane-composition.yaml) — implements the composition pipeline matching XRD to CAPI virtual machines.
@@ -158,7 +158,7 @@ To see the CLI commands, automatic vCluster provisioning, sync waves, and E2E va
     </td>
     <td align="center" width="25%">
       <b>4. Topology & Hierarchy</b><br/>
-      <a href="https://asciinema.org/a/jIzMQQ2x5Imn4cur" target="_blank">
+      <a href="https://asciinema.org/a/j3crkxelJGxwR0Mm" target="_blank">
         <img src="https://asciinema.org/img/play-button.png" width="80" alt="Topology Showcase"/>
       </a>
     </td>
@@ -183,19 +183,11 @@ Running passive and read-only checks...
   • Checking KubeVirt control plane (namespace: kubevirt)...
   ✔ KubeVirt control plane active: 6/6 pods in Running state.
   • Checking active Virtual Machines (VMs) backing the fleet (namespace: fleet)...
-  ✔ Found 12 KubeVirt VMs (12 in Running state) in the 'fleet' namespace.
-      host-a-control-plane-h9mhb      Running   true
-      host-a-md-0-5z44f-nmjkg         Running   true
-      host-b-control-plane-m99hg      Running   true
-      host-b-md-0-z52gt-rht98         Running   true
-      host-c-control-plane-5t7vd      Running   true
-      host-c-control-plane-cfm8j      Running   true
-      host-c-control-plane-l7j2h      Running   true
-      host-c-md-0-q79kb-rlnvc         Running   true
-      host-euw1-control-plane-kfmn9   Running   true
-      host-euw1-md-0-xkzwh-6m7mg      Running   true
-      host-mgmt-control-plane-fsgsq   Running   true
-      host-mgmt-md-0-cr5l8-brwhr      Running   true
+  ✔ Found 4 KubeVirt VMs (4 in Running state) in the 'fleet' namespace.
+      host-euw1-control-plane-gw2k6   Running   true
+      host-euw1-md-0-lvzrh-8twht      Running   true
+      host-mgmt-control-plane-82v4s   Running   true
+      host-mgmt-md-0-ckvd8-9qq6p      Running   true
   • Checking physical x86 compute node (srv-t7910)...
   ✔ Physical node srv-t7910 is READY (Hypervisor compute active).
 
@@ -225,12 +217,9 @@ Running passive and read-only checks...
   ✔ XRD 'hostclusters.fleet.homelab.io' established successfully.
   ✔ Composition 'hostcluster-kubevirt' configured.
   • Checking active HostCluster instances (XR resources)...
-  ✔ Found 5 HostClusters declared via Crossplane:
-      host-a      True     True    hostcluster-kubevirt
-      host-b      True     True    hostcluster-kubevirt
-      host-c      True     True    hostcluster-kubevirt
-      host-euw1   True     True    hostcluster-kubevirt
-      host-mgmt   True     True    hostcluster-kubevirt
+  ✔ Found 2 HostClusters declared via Crossplane:
+      host-euw1   True   True   <none>
+      host-mgmt   True   True   <none>
 
 ═══════════════════════════════════════════════════════════════════════════
  4. Multicluster Provisioning with CAPI & CAPK
@@ -245,25 +234,14 @@ Running passive and read-only checks...
       • capi-system/capi-controller-manager (1 ready)
       • capk-system/capk-controller-manager (1 ready)
   • Checking CAPI Clusters status in 'fleet' namespace...
-  ✔ CAPI is managing 5 Kubernetes clusters:
-      host-a      Provisioned   true   true
-      host-b      Provisioned   true   true
-      host-c      Provisioned   true   true
+  ✔ CAPI is managing 2 Kubernetes clusters:
       host-euw1   Provisioned   true   true
       host-mgmt   Provisioned   true   true
   • Checking CAPI Machine ↔ KubeVirt VM mapping...
-      host-a-control-plane-h9mhb      host-a      Running   host-a-control-plane-h9mhb
-      host-a-md-0-5z44f-nmjkg         host-a      Running   host-a-md-0-5z44f-nmjkg
-      host-b-control-plane-m99hg      host-b      Running   host-b-control-plane-m99hg
-      host-b-md-0-z52gt-rht98         host-b      Running   host-b-md-0-z52gt-rht98
-      host-c-control-plane-5t7vd      host-c      Running   host-c-control-plane-5t7vd
-      host-c-control-plane-cfm8j      host-c      Running   host-c-control-plane-cfm8j
-      host-c-control-plane-l7j2h      host-c      Running   host-c-control-plane-l7j2h
-      host-c-md-0-q79kb-rlnvc         host-c      Running   host-c-md-0-q79kb-rlnvc
-      host-euw1-control-plane-kfmn9   host-euw1   Running   host-euw1-control-plane-kfmn9
-      host-euw1-md-0-xkzwh-6m7mg      host-euw1   Running   host-euw1-md-0-xkzwh-6m7mg
-      host-mgmt-control-plane-fsgsq   host-mgmt   Running   host-mgmt-control-plane-fsgsq
-      host-mgmt-md-0-cr5l8-brwhr      host-mgmt   Running   host-mgmt-md-0-cr5l8-brwhr
+      host-euw1-control-plane-gw2k6   host-euw1   Running   host-euw1-control-plane-gw2k6
+      host-euw1-md-0-lvzrh-8twht      host-euw1   Running   host-euw1-md-0-lvzrh-8twht
+      host-mgmt-control-plane-82v4s   host-mgmt   Running   host-mgmt-control-plane-82v4s
+      host-mgmt-md-0-ckvd8-9qq6p      host-mgmt   Running   host-mgmt-md-0-ckvd8-9qq6p
 
 ═══════════════════════════════════════════════════════════════════════════
  5. Decentralized GitOps (ArgoCD & ClusterResourceSets)
@@ -278,10 +256,11 @@ Running passive and read-only checks...
       • tenant-vclusters
       • tenant-workloads
   • Checking ClusterResourceSets (CRS) for network/GitOps bootstrapping...
-  ✔ Found 4 ClusterResourceSets in 'fleet' namespace (injecting CNI and regional config):
+  ✔ Found 5 ClusterResourceSets in 'fleet' namespace (injecting CNI and regional config):
       • calico-cni
       • calico-vxlan-cni
       • cilium-cni
+      • mgmt-child
       • region-root-eu-west1
 
 ═══════════════════════════════════════════════════════════════════════════
@@ -290,20 +269,13 @@ Running passive and read-only checks...
  ℹ️ What this demonstrates: Real connectivity validation via jump pod inside the management pod network. Verifies that the remote cluster is running, nodes are ready, CNI is healthy, and its local ArgoCD is active.
 
   • Interacting with host-euw1 (jump pod)...
+    
     ══ CLUSTER host-euw1 ══
       ✔ CAPI: phase=Provisioned controlPlaneReady=true
       ✔ nodos Ready: 2
       ✔ CNI pods Running: 3
       ✔ DNS cross-node (MTU): OK
       ✔ StorageClass: 1
-      ✔ ArgoCD propio: 3 apps
-      ✔ vClusters: 1
-          vc: vcluster-register-29700080-7drr8 Completed
-          vc: coredns-df8c87f55-2p7mp-x-kube-system-x-vcluster-tenant-a-dev Running
-          vc: tenant-a-customer-api-897db9d68-r5rq8-x-tenant-a-x-v-e3aec378ea Running
-          vc: tenant-a-customer-web-5fcdf6ccb5-bnl5w-x-tenant-a-x--c97081183e Running
-          vc: tenant-a-postgres-0-x-tenant-a-x-vcluster-tenant-a-dev Running
-          vc: vcluster-tenant-a-dev-0 Running
 
 ═══════════════════════════════════════════════════════════════════════════
  7. Tenant Virtual Control Plane & Network Isolation (vCluster + CNP)
@@ -311,16 +283,17 @@ Running passive and read-only checks...
  ℹ️ What this demonstrates: Virtual API server and etcd per tenant via vCluster, avoiding CRD conflicts. Physical network is isolated with host-side CiliumNetworkPolicies, blocking cross-tenant traffic.
 
   • Listing active vClusters on the host...
-                      NAME             |          NAMESPACE           | STATUS  | VERSION | CONNECTED | AGE
-        -------------------------------+------------------------------+---------+---------+-----------+-------
-          vcluster-tenant-a-acceptance | vcluster-tenant-a-acceptance | Running | 0.35.0  |           | 3d5h
-          vcluster-tenant-a-dev        | vcluster-tenant-a-dev        | Running | 0.35.0  |           | 3d5h
-          vcluster-tenant-a-prod       | vcluster-tenant-a-prod       | Running | 0.35.0  |           | 3d5h
-          vcluster-tenant-b-dev        | vcluster-tenant-b-dev        | Running | 0.35.0  |           | 3d5h
-          vcluster-tenant-c-dev        | vcluster-tenant-c-dev        | Running | 0.35.0  |           | 3d1h
-          vcluster-tenant-x-dev        | vcluster-tenant-x-dev        | Running | 0.35.0  |           | 71m
-          vcluster-tenant-y-dev        | vcluster-tenant-y-dev        | Running | 0.35.0  |           | 67m
-
+        
+                      NAME             |          NAMESPACE           | STATUS  | VERSION | CONNECTED |  AGE   
+        -------------------------------+------------------------------+---------+---------+-----------+--------
+          vcluster-tenant-a-acceptance | vcluster-tenant-a-acceptance | Running | 0.35.0  |           | 3d22h  
+          vcluster-tenant-a-dev        | vcluster-tenant-a-dev        | Running | 0.35.0  |           | 3d22h  
+          vcluster-tenant-a-prod       | vcluster-tenant-a-prod       | Running | 0.35.0  |           | 3d22h  
+          vcluster-tenant-b-dev        | vcluster-tenant-b-dev        | Running | 0.35.0  |           | 3d22h  
+          vcluster-tenant-c-dev        | vcluster-tenant-c-dev        | Running | 0.35.0  |           | 3d18h  
+          vcluster-tenant-x-dev        | vcluster-tenant-x-dev        | Running | 0.35.0  |           | 18h    
+          vcluster-tenant-y-dev        | vcluster-tenant-y-dev        | Running | 0.35.0  |           | 18h    
+        
   • Checking network isolation policies (CiliumNetworkPolicy) on the host...
   ✔ Found 7 CiliumNetworkPolicies on the host:
       vcluster-tenant-a-acceptance   tenant-a-isolation
@@ -347,21 +320,21 @@ Running passive and read-only checks...
       tenant-a-web-route   [web.tenant-a.example.local]
   • Checking cert-manager TLS Certificates for Gateways...
   ✔ Found 15 TLS certificates managed by cert-manager:
-      caaph-system                        caaph-serving-cert                          True
-      capi-kubeadm-bootstrap-system       capi-kubeadm-bootstrap-serving-cert         True
-      capi-kubeadm-control-plane-system   capi-kubeadm-control-plane-serving-cert     True
-      capi-operator-system                capi-operator-serving-cert                  True
-      capi-system                         capi-serving-cert                           True
-      capk-system                         capk-serving-cert                           True
-      cert-manager                        cluster-home-ca                             True
-      gateway                             cluster-home-wildcard                       True
-      vcluster-tenant-a-acceptance        tenant-a-tls                                True
-      vcluster-tenant-a-dev               tenant-a-tls                                True
-      vcluster-tenant-a-prod              tenant-a-tls                                True
-      vcluster-tenant-b-dev               tenant-b-tls                                True
-      vcluster-tenant-c-dev               tenant-c-tls                                True
-      vcluster-tenant-x-dev               tenant-x-tls                                True
-      vcluster-tenant-y-dev               tenant-y-tls                                True
+      caaph-system                        caaph-serving-cert                        True
+      capi-kubeadm-bootstrap-system       capi-kubeadm-bootstrap-serving-cert       True
+      capi-kubeadm-control-plane-system   capi-kubeadm-control-plane-serving-cert   True
+      capi-operator-system                capi-operator-serving-cert                True
+      capi-system                         capi-serving-cert                         True
+      capk-system                         capk-serving-cert                         True
+      cert-manager                        cluster-home-ca                           True
+      gateway                             cluster-home-wildcard                     True
+      vcluster-tenant-a-acceptance        tenant-a-tls                              True
+      vcluster-tenant-a-dev               tenant-a-tls                              True
+      vcluster-tenant-a-prod              tenant-a-tls                              True
+      vcluster-tenant-b-dev               tenant-b-tls                              True
+      vcluster-tenant-c-dev               tenant-c-tls                              True
+      vcluster-tenant-x-dev               tenant-x-tls                              True
+      vcluster-tenant-y-dev               tenant-y-tls                              True
 
 ✔ SHOWCASE & VALIDATION COMPLETE!
 All platform architecture components have been passively validated.
@@ -372,101 +345,113 @@ All platform architecture components have been passively validated.
 <summary><b>Click to expand the full text output of <code>./cli/showcase-topology</code></b></summary>
 
 ```text
-Starting Platform Topology & Hierarchy Showcase (Read-Only)
+Platform Topology & vCluster Models Showcase (read-only, live)
 
 ═══════════════════════════════════════════════════════════════════════════
- 1. Root Management Cluster (Physical k3s) & Hypervisor
+ 1. The Root cluster is the hypervisor AND hosts vClusters (MODEL 1)
 ═══════════════════════════════════════════════════════════════════════════
- ℹ️ Concept: Your physical HA k3s cluster acts as both the Root Management
- Plane and the KubeVirt Hypervisor. KubeVirt runs directly on this substrate.
+ ℹ️ Concept: The physical HA k3s cluster wears two hats at once: it runs KubeVirt (so it is the VM hypervisor) and it also runs tenant vClusters directly on itself (centralized).
 
-  • Listing physical cluster nodes (the root infrastructure):
-      srv-pi-rack1          Ready   <none>                      29d    v1.35.5+k3s1   192.168.178.65
-      srv-pi-rack2a         Ready   <none>                      29d    v1.35.5+k3s1   192.168.178.40
-      srv-pi-rack2b         Ready   <none>                      29d    v1.35.5+k3s1   192.168.178.130
-      srv-rk1-nvme-01       Ready   <none>                      29d    v1.35.5+k3s1   192.168.178.131
-      srv-rk1-nvme-02       Ready   <none>                      29d    v1.35.5+k3s1   192.168.178.48
-      srv-rk1-nvme-03       Ready   <none>                      29d    v1.35.5+k3s1   192.168.178.51
-      srv-rk1-nvme-04       Ready   <none>                      29d    v1.35.5+k3s1   192.168.178.54
-      srv-super6c-01-nvme   Ready   control-plane,etcd,worker   30d    v1.35.5+k3s1   192.168.178.120
-      srv-super6c-02-nvme   Ready   control-plane,etcd,worker   2d3h   v1.35.5+k3s1   192.168.178.121
-      srv-super6c-04-nvme   Ready   control-plane,etcd,worker   2d3h   v1.35.5+k3s1   192.168.178.122
-      srv-super6c-05-emmc   Ready   <none>                      2d2h   v1.35.5+k3s1   192.168.178.124
-      srv-super6c-06-emmc   Ready   <none>                      2d2h   v1.35.5+k3s1   192.168.178.123
-      srv-t7910             Ready   <none>                      8d     v1.35.5+k3s1   192.168.178.90
+  • Physical cluster nodes (the substrate):
+      srv-pi-rack1          Ready   <none>                      29d     v1.35.5+k3s1   192.168.178.65    <none>   Ubuntu 24.04.3 LTS   6.8.0-1053-raspi      containerd://2.2.3-k3s1
+      srv-pi-rack2a         Ready   <none>                      29d     v1.35.5+k3s1   192.168.178.40    <none>   Ubuntu 24.04.1 LTS   6.8.0-1053-raspi      containerd://2.2.3-k3s1
+      srv-pi-rack2b         Ready   <none>                      29d     v1.35.5+k3s1   192.168.178.130   <none>   Ubuntu 24.10         6.11.0-1015-raspi     containerd://2.2.3-k3s1
+      srv-rk1-nvme-01       Ready   <none>                      29d     v1.35.5+k3s1   192.168.178.131   <none>   Ubuntu 24.04.1 LTS   6.1.0-1025-rockchip   containerd://2.2.3-k3s1
+      srv-rk1-nvme-02       Ready   <none>                      29d     v1.35.5+k3s1   192.168.178.48    <none>   Ubuntu 24.04.1 LTS   6.1.0-1025-rockchip   containerd://2.2.3-k3s1
+      srv-rk1-nvme-03       Ready   <none>                      29d     v1.35.5+k3s1   192.168.178.51    <none>   Ubuntu 24.04.1 LTS   6.1.0-1025-rockchip   containerd://2.2.3-k3s1
+      srv-rk1-nvme-04       Ready   <none>                      29d     v1.35.5+k3s1   192.168.178.54    <none>   Ubuntu 24.04.1 LTS   6.1.0-1025-rockchip   containerd://2.2.3-k3s1
+      srv-super6c-01-nvme   Ready   control-plane,etcd,worker   30d     v1.35.5+k3s1   192.168.178.120   <none>   Ubuntu 24.04.4 LTS   6.8.0-1053-raspi      containerd://2.2.3-k3s1
+      srv-super6c-02-nvme   Ready   control-plane,etcd,worker   2d20h   v1.35.5+k3s1   192.168.178.121   <none>   Ubuntu 24.04.4 LTS   6.8.0-1053-raspi      containerd://2.2.3-k3s1
+      srv-super6c-04-nvme   Ready   control-plane,etcd,worker   2d19h   v1.35.5+k3s1   192.168.178.122   <none>   Ubuntu 24.04.4 LTS   6.8.0-1047-raspi      containerd://2.2.3-k3s1
+      srv-super6c-05-emmc   Ready   <none>                      2d18h   v1.35.5+k3s1   192.168.178.124   <none>   Ubuntu 24.04.4 LTS   6.8.0-1051-raspi      containerd://2.2.3-k3s1
+      srv-super6c-06-emmc   Ready   <none>                      2d18h   v1.35.5+k3s1   192.168.178.123   <none>   Ubuntu 24.04.4 LTS   6.8.0-1053-raspi      containerd://2.2.3-k3s1
+      srv-t7910             Ready   <none>                      8d      v1.35.5+k3s1   192.168.178.90    <none>   Ubuntu 26.04 LTS     7.0.0-22-generic      containerd://2.2.3-k3s1
 
-  • Checking if KubeVirt virtualization engine is active on the root nodes:
-      virt-handler-jz9lq   1/1   Running   srv-t7910
-  ✔ The physical node srv-t7910 is acting as the KubeVirt virtualization host.
-
-═══════════════════════════════════════════════════════════════════════════
- 2. Virtual Compute Layer (KubeVirt VMs)
-═══════════════════════════════════════════════════════════════════════════
- ℹ️ Concept: The nodes of the guest CAPI clusters are NOT physical. They are
- running as KubeVirt Virtual Machine Instances (VMIs) hosted on the srv-t7910
- hypervisor.
-
-  • Listing Virtual Machines (VMs) running on top of srv-t7910:
-      host-a-control-plane-h9mhb      10.0.6.173   Running
-      host-a-md-0-5z44f-nmjkg         10.0.6.253   Running
-      host-b-control-plane-m99hg      10.0.6.141   Running
-      host-b-md-0-z52gt-rht98         10.0.6.235   Running
-      host-c-control-plane-5t7vd      10.0.6.182   Running
-      host-c-control-plane-cfm8j      10.0.6.17    Running
-      host-c-control-plane-l7j2h      10.0.6.24    Running
-      host-c-md-0-q79kb-rlnvc         10.0.6.246   Running
-      host-euw1-control-plane-kfmn9   10.0.6.180   Running
-      host-euw1-md-0-xkzwh-6m7mg      10.0.6.6     Running
-      host-mgmt-control-plane-fsgsq   10.0.6.150   Running
-      host-mgmt-md-0-cr5l8-brwhr      10.0.6.184   Running
-  ✔ All virtual nodes are active and mapped to srv-t7910.
+  • KubeVirt virtualization engine running on the substrate:
+      virt-handler-jz9lq   1/1   Running   102 (174m ago)   2d17h   10.0.6.222   srv-t7910   <none>   <none>
+  ✔ srv-t7910 is the KubeVirt hypervisor — and (see §4) the same cluster also hosts vClusters.
 
 ═══════════════════════════════════════════════════════════════════════════
- 3. Cluster Provisioning: Host Clusters vs. Child Managements
+ 2. A management cluster creates whole host clusters as KubeVirt VMs (MODEL 2)
 ═══════════════════════════════════════════════════════════════════════════
- ℹ️ Concept: Crossplane v2 and CAPI provision virtual clusters on the VMs.
- We distinguish between regular Host Clusters (workload hosts) and Child
- Management Clusters (which run their own ArgoCD).
+ ℹ️ Concept: Crossplane v2 (HostCluster XR) + Cluster API (CAPI) + provider-KubeVirt (CAPK) declaratively turn a one-file request into a full Kubernetes cluster whose NODES are VMs.
 
-  • Listing Crossplane HostCluster (XR) instances:
-      host-a      host                    True   True
-      host-b      host                    True   True
-      host-c      host                    True   True
-      host-euw1   management   eu-west1   True   True
-      host-mgmt   management              True   True
+  • KubeVirt VMs backing the guest clusters (these ARE the cluster nodes):
+      host-euw1-control-plane-gw2k6   10.0.6.132   <none>   Running
+      host-euw1-md-0-lvzrh-8twht      10.0.6.123   <none>   Running
+      host-mgmt-control-plane-82v4s   10.0.6.157   <none>   Running
+      host-mgmt-md-0-ckvd8-9qq6p      10.0.6.42    <none>   Running
 
-  • Listing corresponding CAPI Clusters:
-      host-a      Provisioned   true   true
-      host-b      Provisioned   true   true
-      host-c      Provisioned   true   true
+  • Crossplane HostCluster XRs → composed into CAPI Clusters:
+      host-euw1   regional     eu-west1   calico-vxlan   True
+      host-mgmt   management              calico-vxlan   True
+
       host-euw1   Provisioned   true   true
       host-mgmt   Provisioned   true   true
-  ✔ We have 2 Management clusters (host-mgmt, host-euw1) and 3 Host clusters
-    (host-a/b/c).
+  ✔ Each row is a real Kubernetes cluster whose control-plane/worker nodes are VMs on srv-t7910.
 
 ═══════════════════════════════════════════════════════════════════════════
- 4. Tenant Placement: Centralized vs. Decentralized (Regional) vClusters
+ 3. Each host runs its OWN ArgoCD + its OWN vClusters (MODELS 3 & 4)
 ═══════════════════════════════════════════════════════════════════════════
- ℹ️ Concept: We support two tenancy models: Centralized vClusters (running
- directly on the Root Management Cluster) and Decentralized vClusters (running
- inside virtual regional hosts).
+ ℹ️ Concept: Decentralized GitOps: the management ArgoCD only creates clusters; each created host (role=management) gets its own ArgoCD (via CAAPH) seeded with a region-root, and provisions ITS region's vClusters locally — no central SPOF. A host promoted to management is the 'management-child' rung.
 
-  • Checking CENTRALIZED tenants (running directly on the Root Management Cluster):
-      vcluster-tenant-b-dev   | Running | 0.35.0
-      vcluster-tenant-c-dev   | Running | 0.35.0
-      vcluster-tenant-x-dev   | Running | 0.35.0
-      vcluster-tenant-y-dev   | Running | 0.35.0
+  • Management-role clusters (each runs its own ArgoCD):
+      host-mgmt (region=none) → local ArgoCD apps: 1
+  ✔ ArgoCD is sharded per cluster — the management plane is not a single point of failure.
 
-  • Checking DECENTRALIZED tenants (running inside a regional virtual host cluster,
-    e.g. host-euw1):
-  • Connecting to host-euw1 via jump pod to list regional vClusters inside it...
-      • Namespace: vcluster-tenant-a-dev (Active)
-  ✔ Decentralized vClusters are fully sharded into their respective regional
-    host VMs!
+═══════════════════════════════════════════════════════════════════════════
+ 4. vCluster placement — centralized (Root) vs decentralized (regional)
+═══════════════════════════════════════════════════════════════════════════
+ ℹ️ Concept: The SAME tenant chart (vCluster + Postgres + api + web + quota + netpol) runs either directly on the Root (centralized) or inside a regional host (decentralized). Same contract, different placement.
 
-✔ TOPOLOGY SHOWCASE COMPLETE!
-This demonstrates how KubeVirt VMs back CAPI clusters, how child managements
-are sharded, and how tenants are distributed.
+  • CENTRALIZED vClusters (running directly on the Root cluster):
+      • vcluster-tenant-a-acceptance
+      • vcluster-tenant-a-dev
+      • vcluster-tenant-a-prod
+      • vcluster-tenant-b-dev
+      • vcluster-tenant-c-dev
+      • vcluster-tenant-x-dev
+      • vcluster-tenant-y-dev
+
+  • DECENTRALIZED vClusters (inside each regional host, queried via jump pod):
+  ✔ Tenants are sharded across regional host VMs — the decentralized fleet model.
+
+═══════════════════════════════════════════════════════════════════════════
+ 5. Variants validated: HA control plane & per-cluster CNI experiments
+═══════════════════════════════════════════════════════════════════════════
+ ℹ️ Concept: On the same substrate we A/B-tested control-plane HA (etcd quorum) and three CNIs. On nested KubeVirt the per-VM masquerade interfered with cross-VM overlay traffic (IPIP/Cilium); Calico-VXLAN is what we validated end-to-end (README §3.1 — framed as an experiment, not a verdict).
+
+  • Control-plane replicas per cluster (HA = 3 → etcd quorum 2/3):
+      host-euw1-control-plane   1     1     true
+      host-mgmt-control-plane   1     1     true
+
+  • CNI chosen per cluster (the experiment knob, spec.cni):
+      host-euw1   calico-vxlan
+      host-mgmt   calico-vxlan
+  ✔ CNI is a per-cluster field; multi-VM clusters standardized on calico-vxlan after the experiment.
+
+═══════════════════════════════════════════════════════════════════════════
+ 6. Management-of-managements: host-mgmt CREATES its own child (MODEL 6)
+═══════════════════════════════════════════════════════════════════════════
+ ℹ️ Concept: host-mgmt is not just a workload host — it runs FULL CAPI and creates ITS OWN host cluster (mgmt-child). The child's VMs run on the Root's KubeVirt via CAPK external-infra (the only KVM node). Recursive fleet: a management cluster spawning more clusters, all GitOps.
+
+  • host-mgmt runs CAPI (it IS a management cluster — providers Ready):
+      coreprovider.operator.cluster.x-k8s.io/cluster-api ready=True
+      bootstrapprovider.operator.cluster.x-k8s.io/kubeadm ready=True
+      controlplaneprovider.operator.cluster.x-k8s.io/kubeadm ready=True
+      infrastructureprovider.operator.cluster.x-k8s.io/kubevirt ready=True
+
+  • host-mgmt CREATED a child cluster (mgmt-child):
+      default   mgmt-child         Provisioned   29m   
+
+  • the child's VMs run on the ROOT's KubeVirt (namespace mgmt-child, via external-infra):
+      mgmt-child-control-plane-zcvr7   10.0.6.158   <none>   Running
+      mgmt-child-md-0-257tx-vctmk      10.0.6.208   <none>   Running
+  ✔ host-mgmt → creates mgmt-child → its VMs land on the Root's KubeVirt. Management-of-managements.
+
+✔ TOPOLOGY & MODELS SHOWCASE COMPLETE
+Same homelab, every model: hypervisor+host (1), mgmt creates clusters (2), decentralized
+regional ArgoCD (3,4), HA + CNI variants (5), and management-of-managements (6: host-mgmt → child).
 ```
 </details>
 
