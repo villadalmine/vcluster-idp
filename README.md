@@ -491,21 +491,14 @@ multi-region / security Design Questions answered in §5.
 > [`models-decision-matrix.mermaid`](./models-decision-matrix.mermaid)) — the three core models side by
 > side and the Design Question each one answers.
 
-**The three core models at a glance** (the full 8-variant spectrum is the table further below):
-
-| Model | Where tenants run | Who creates that cluster | Own ArgoCD? | `region`? | Tenants today | Answers |
-|---|---|---|---|---|---|---|
-| **① Easy path** (centralized) | namespaces of the **Root** | already exists (the Root) | no — the **central** one | — *(none)* | a / b / c / x / y | DQ1 (~10), DQ2, DQ6 |
-| **② CAPI regional** | `host-euw1` **worker** | the **Root** (CAPI / Crossplane) | yes — inside `host-euw1` | `eu-west1` | tenant-a | DQ1 (100/1000), DQ3, DQ5 |
-| **③ Recursive** (mgmt-of-mgmt) | `mgmt-child` **worker** | `host-mgmt` (itself created by the Root) | yes — inside `mgmt-child` | `mc-euw1` | tenant-z | DQ1 (recursive) |
-
-In models ② and ③ the host cluster's **control-plane hosts no tenants** — vClusters run only on the **worker** (`controlPlaneReplicas: 1` + `workerReplicas: 1`).
-
-**Why `region` shows up only in ② and ③:** decentralized GitOps gives every created host cluster its *own*
-ArgoCD, all reading the *same* Git repo. `region` is the partition label that tells each ArgoCD which slice
-of `clusters/regions/<region>/tenants/` is **its** set of tenants. Model ① has a single (central) ArgoCD, so
-there is nothing to partition — that is why `region` never appears there. `eu-west1` and `mc-euw1` are just
-two partition names: one for the direct regional rung, one for the recursive (management-of-managements) rung.
+**Where each model's tenants live in Git (`region` = the partition label).** Decentralized GitOps gives every
+created host cluster its **own** ArgoCD, and they all read the **same** Git repo — so `region` is the label that
+tells each ArgoCD which slice of [`clusters/regions/<region>/tenants/`](./clusters/regions/) is **its** set of
+tenants (`eu-west1` for the direct regional rung, `mc-euw1` for the recursive management-of-managements rung).
+The **centralized** model (Model 1) has a single, central ArgoCD with nothing to partition, so it carries no
+`region` — its tenants live in [`tenants/<env>/`](./tenants/) instead. On the regional and recursive host
+clusters the **control-plane hosts no tenants**: vClusters run only on the **worker**
+(`controlPlaneReplicas: 1` + `workerReplicas: 1`).
 
 | # | Model / Variant | Who provisions the host & where the vCluster runs | Live example | Answers Design Question |
 |---|---|---|---|---|
