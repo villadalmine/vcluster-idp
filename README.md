@@ -4,6 +4,8 @@ This repository implements a lightweight, declarative, and GitOps-driven **Inter
 
 Each tenant receives an isolated control plane (**vCluster**), a dedicated PostgreSQL database, two applications, auto-generated credentials, resource governance, network isolation, and external HTTPS access. The platform runs entirely through a GitOps facade (a CLI that commits to Git), allowing ArgoCD to reconcile and prune resources automatically.
 
+> **In one sentence (end-to-end flow):** a developer commits one file (`platform <tenant> create` → Git) → **ArgoCD** reconciles it → **Crossplane + CAPI + KubeVirt** build the host clusters as VMs → **CAAPH + ClusterResourceSet** give each cluster its own ArgoCD → that ArgoCD uses **ApplicationSets + Helm + vCluster** to hand every tenant an isolated environment — all declarative, all GitOps, validated end-to-end down to a recursive *management-of-managements* (a management cluster that creates and fully serves its own child), torn down and rebuilt **clean-room from Git**.
+
 ---
 
 ## ── Repository Code Map ──
