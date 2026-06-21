@@ -106,7 +106,7 @@ If you do not have ArgoCD running or want to run a quick test without committing
 To see the CLI commands, automatic vCluster provisioning, sync waves, and E2E validation suite (`make validate`) running in real-time, you can watch the interactive terminal recording below:
 
 - [![asciinema  for tenant-creation play butt n](https://asciinema.org/img/play-button.png)](https://asciinema.org/a/ha0577C30eV22PwJ)
-- [![asciinema  for tenant-creation play butt n](https://asciinema.org/img/play-button.png)](https://asciinema.org/a/KbTlRvky9mGqSoo9)
+- [![asciinema  for tenant Validation play butt n](https://asciinema.org/img/play-button.png)](https://asciinema.org/a/KbTlRvky9mGqSoo9)
 
 
 
