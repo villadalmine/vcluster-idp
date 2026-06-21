@@ -487,9 +487,15 @@ the cluster that hosts it**. The same physical homelab was used to stand up and 
 spectrum below. Each row is a distinct, real model — not a paper design — and maps to the scaling /
 multi-region / security Design Questions answered in §5.
 
-> 📊 **Decision-matrix diagram:** [`models-decision-matrix.svg`](./models-decision-matrix.svg) (source:
-> [`models-decision-matrix.mermaid`](./models-decision-matrix.mermaid)) — the three core models side by
-> side and the Design Question each one answers.
+<p align="center">
+  <img src="./models-decision-matrix.svg" alt="The three core cluster-topology models (centralized, CAPI regional, recursive) and the Design Question each one answers" width="920"/>
+</p>
+
+> 📊 **The three core models at a glance** ([diagram source](./models-decision-matrix.mermaid)): the
+> **centralized easy-path**, the **CAPI regional fleet**, and the **recursive management-of-managements** —
+> showing for each one who creates the cluster, where the tenants' Git lives, and which Design Question it
+> answers. The full 8-variant spectrum (these three + the orthogonal HA / CNI / isolation / storage knobs) is
+> the table further below.
 
 **Where each model's tenants live in Git (`region` = the partition label).** Decentralized GitOps gives every
 created host cluster its **own** ArgoCD, and they all read the **same** Git repo — so `region` is the label that
