@@ -1,6 +1,6 @@
 # Cluster HIJO creado por host-mgmt (management-of-managements). Se aplica EN host-mgmt; su CAPK crea las
 # VMs en el KubeVirt del Root vía external-infra (KubevirtCluster.spec.infraClusterSecretRef → secret
-# mgmt-child-infra con el kubeconfig al Root). containerDisk (boot rápido) + masquerade + amd64/t7910.
+# mgmt-child-infra con el kubeconfig al Root). DataVolume sobre Longhorn (30Gi, evita disk-pressure) + amd64/t7910.
 # Primero a mano para validar; luego se sirve por GitOps (CRS → ArgoCD de host-mgmt).
 apiVersion: cluster.x-k8s.io/v1beta1
 kind: Cluster
@@ -77,6 +77,19 @@ spec:
           namespace: mgmt-child           # ns en el Root donde viven las VMs (el del SA/RBAC)
         spec:
           runStrategy: Always
+          # Disco = DataVolume (CDI importa la cloud-image a un PVC de Longhorn 30Gi). Reemplaza el
+          # containerDisk efímero (~3Gi) que daba disk-pressure y evictaba los pods del vcluster del hijo.
+          # Mismo patrón que la composición Crossplane de los host clusters. CAPK prefija el DV por-máquina.
+          dataVolumeTemplates:
+            - metadata: { name: boot-volume }
+              spec:
+                pvc:
+                  accessModes: [ReadWriteOnce]
+                  resources: { requests: { storage: 30Gi } }
+                  storageClassName: longhorn-vm
+                source:
+                  registry:
+                    url: "docker://quay.io/capk/ubuntu-2404-container-disk:v1.31.5"
           template:
             spec:
               architecture: amd64
@@ -85,14 +98,14 @@ spec:
                 memory: { guest: 4Gi }
                 devices:
                   disks:
-                    - { name: containervolume, disk: { bus: virtio } }
+                    - { name: dv-volume, disk: { bus: virtio } }
                   # SIN interfaces/networks custom: CAPK usa su default (bridge → IP única del pod por VM).
                   # Si forzás masquerade, TODOS los nodos quedan con 10.0.2.2 → colisión → calico no rutea.
               evictionStrategy: External
               nodeSelector: { kubernetes.io/hostname: srv-t7910 }
               volumes:
-                - name: containervolume
-                  containerDisk: { image: quay.io/capk/ubuntu-2404-container-disk:v1.31.5 }
+                - name: dv-volume
+                  dataVolume: { name: boot-volume }
 ---
 apiVersion: cluster.x-k8s.io/v1beta1
 kind: MachineDeployment
@@ -131,6 +144,19 @@ spec:
           namespace: mgmt-child
         spec:
           runStrategy: Always
+          # Disco = DataVolume (CDI importa la cloud-image a un PVC de Longhorn 30Gi). Reemplaza el
+          # containerDisk efímero (~3Gi) que daba disk-pressure y evictaba los pods del vcluster del hijo.
+          # Mismo patrón que la composición Crossplane de los host clusters. CAPK prefija el DV por-máquina.
+          dataVolumeTemplates:
+            - metadata: { name: boot-volume }
+              spec:
+                pvc:
+                  accessModes: [ReadWriteOnce]
+                  resources: { requests: { storage: 30Gi } }
+                  storageClassName: longhorn-vm
+                source:
+                  registry:
+                    url: "docker://quay.io/capk/ubuntu-2404-container-disk:v1.31.5"
           template:
             spec:
               architecture: amd64
@@ -139,14 +165,14 @@ spec:
                 memory: { guest: 4Gi }
                 devices:
                   disks:
-                    - { name: containervolume, disk: { bus: virtio } }
+                    - { name: dv-volume, disk: { bus: virtio } }
                   # SIN interfaces/networks custom: CAPK usa su default (bridge → IP única del pod por VM).
                   # Si forzás masquerade, TODOS los nodos quedan con 10.0.2.2 → colisión → calico no rutea.
               evictionStrategy: External
               nodeSelector: { kubernetes.io/hostname: srv-t7910 }
               volumes:
-                - name: containervolume
-                  containerDisk: { image: quay.io/capk/ubuntu-2404-container-disk:v1.31.5 }
+                - name: dv-volume
+                  dataVolume: { name: boot-volume }
 ---
 apiVersion: bootstrap.cluster.x-k8s.io/v1beta1
 kind: KubeadmConfigTemplate
