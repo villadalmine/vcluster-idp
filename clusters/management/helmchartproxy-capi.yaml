@@ -1,0 +1,33 @@
+# Fase 2 (management-of-managements): instala Cluster API DENTRO de los clusters role=management
+# (hoy host-mgmt) vía CAAPH/Helm — el mismo patrón con el que les instalamos ArgoCD. Así host-mgmt
+# deja de ser sólo "tiene ArgoCD" y pasa a ser un MANAGEMENT de verdad: puede CREAR host clusters.
+# El chart cluster-api-operator instala el operator + los providers (core/bootstrap/controlPlane +
+# infra kubevirt) declarados por values, y su propio cert-manager (host-mgmt no tiene uno).
+# El CAPK de host-mgmt creará las VMs del hijo sobre el KubeVirt del Root (external-infra; ver el
+# manifest del hijo en clusters/management-child/). Selector role=management → NO toca los regional.
+apiVersion: addons.cluster.x-k8s.io/v1alpha1
+kind: HelmChartProxy
+metadata:
+  name: capi-operator
+  namespace: fleet
+spec:
+  clusterSelector:
+    matchLabels:
+      platform.idp/role: management
+  repoURL: https://kubernetes-sigs.github.io/cluster-api-operator
+  chartName: cluster-api-operator
+  version: "0.21.0"          # mismo pin que el Root (platform/addons/cluster-api-operator.yaml)
+  releaseName: capi-operator
+  namespace: capi-operator-system
+  options:
+    install:
+      createNamespace: true
+    timeout: 15m
+    wait: true
+  valuesTemplate: |
+    cert-manager:
+      enabled: true          # host-mgmt no tiene cert-manager; el operator lo necesita
+    core: "cluster-api:v1.10.10"
+    bootstrap: "kubeadm:v1.10.10"
+    controlPlane: "kubeadm:v1.10.10"
+    infrastructure: "kubevirt:v0.10.5"   # CAPK v1beta1-contract (igual que el Root)

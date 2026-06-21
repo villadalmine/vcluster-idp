@@ -8,20 +8,12 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: fleet
 resources:
-  - helmchartproxy-argocd.yaml
+  - helmchartproxy-argocd.yaml   # CAAPH → ArgoCD en role in (management,regional)
+  - helmchartproxy-capi.yaml     # CAAPH → CAPI en role=management (Fase 2: host-mgmt crea clusters)
   - region-root-crs.yaml
 configMapGenerator:
   - name: region-root-eu-west1
     files:
       - region-root-eu-west1.yaml
-  - name: region-root-us-east1
-    files:
-      - region-root-us-east1.yaml
-  - name: region-root-us-west1
-    files:
-      - region-root-us-west1.yaml
-  - name: region-root-us-central1
-    files:
-      - region-root-us-central1.yaml
 generatorOptions:
   disableNameSuffixHash: true   # el CRS referencia el ConfigMap por nombre exacto
