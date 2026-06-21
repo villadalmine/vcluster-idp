@@ -660,13 +660,14 @@ Our platform is architected to scale out using a multi-cluster fleet design rath
 
 ## 6. Trade-offs (what was simplified — on purpose)
 *   **Single KVM node = SPOF.** All guest VMs are pinned to one x86/KVM host (`srv-t7910`); even the "HA" control plane stacks its 3 VMs on that one box, so it is HA against a VM/process failure but **not** against the node dying (full detail + recovery lesson in §3.2).
-*   **vCluster shared-nodes = soft isolation.** Tenants get an isolated control plane but **share worker nodes** (chosen for density). The stronger rungs (dedicated/private nodes → fully separate clusters) are designed (§3.1 model 7) but not all run live.
+*   **vCluster shared-nodes = soft isolation.** Tenants get an isolated control plane (own API/etcd/CRDs) but **share the worker nodes' kernel** (chosen for density). The honest residual risk is that shared kernel — noisy-neighbor and kernel-escape. The stronger isolation rungs that close it are designed (§3.1 model 7, and §7 below) but not run live.
 *   **Secrets default to Helm-generated, in-chart.** Simple and Git-driven, but **no rotation / dynamic secrets**; a real backend (ESO) is opt-in, not the default.
 *   **CNI chosen empirically.** We converged on **calico-vxlan** for nested KubeVirt and did **not** exhaustively tune the Cilium guest-overlay path (MTU / `kubeProxyReplacement`) once VXLAN worked.
 *   **Explicitly out of scope** (per the brief): CI/CD pipelines, service mesh, production-grade HA, backups, a monitoring stack, custom operators, full Terraform, and enterprise IAM.
 
 ## 7. Future Improvements (with more time)
-*   **Real node-failure resilience:** multiple hypervisor nodes + `evictionStrategy: LiveMigrate` + replicated storage to drain a failing node; control plane spread **across** physical nodes; `MachineHealthCheck` with a tuned `maxUnhealthy` (~40%).
+*   **Real node-failure resilience:** several hypervisor nodes so a guest-node VM can be **live-migrated** (KubeVirt moves a *running* VM to another host with no downtime — a virtualization feature, not vanilla k8s) off a failing node; spread the 3 control-plane VMs **across different physical nodes** so etcd keeps quorum (2/3) if one node dies (today they stack on one box); and the CAPI **`MachineHealthCheck`** (auto-deletes + recreates an unhealthy node) tuned with `maxUnhealthy ~40%`.
+*   **Stronger tenant isolation, one rung at a time** (not jumping straight to separate clusters): **vNode** adds kernel-level isolation (user namespaces) on the *same* shared hardware — closing the shared-kernel residual risk above **without** dedicating nodes (a commercial product, hence design-only); **dedicated nodes** (a labeled node pool) for **GPU/ML** tenants that need predictable capacity; **private nodes** (real worker nodes per tenant) for regulated / paying customers.
 *   **Secrets-as-a-service:** a real backend (Vault / OpenBao) via ESO with **per-tenant policy/path** and Workload-Identity bootstrap (no static creds) — see `secrets-flow.svg` in §Q6.
 *   **Centralized observability:** the **LGTM** stack (Loki/Grafana/Tempo/Mimir) with OIDC multi-tenancy keyed by tenant ID.
 *   **Progressive delivery:** Argo Rollouts (canary / blue-green) wired to the Gateway API routes.
