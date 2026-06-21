@@ -12,6 +12,7 @@ metadata:
     # y su CRS le siembra el region-root (selector region=mc-euw1). Espeja el modelo del Root un nivel abajo.
     platform.idp/role: regional
     platform.idp/region: mc-euw1
+    cni: calico-vxlan        # el CRS calico-vxlan-cni (que el ArgoCD de host-mgmt crea en su ns default) lo matchea y le siembra el CNI
 spec:
   clusterNetwork:
     pods:

@@ -4,6 +4,33 @@
 # queda con su PROPIO ArgoCD descentralizado que despliega su propio vCluster (sin SPOF). namespace=default
 # porque el Cluster mgmt-child vive en default dentro de host-mgmt (HelmChartProxy/CRS seleccionan en su ns).
 #
+# 0) CNI del hijo (huevo-gallina): mgmt-child NO puede correr su propio ArgoCD sin CNI, así que el CNI
+#    debe venir de AFUERA, vía host-mgmt, ANTES. Esta Application corre en el ArgoCD de host-mgmt y aplica
+#    clusters/cni en su PROPIO ns default → crea el CRS calico-vxlan-cni en host-mgmt → su CRS controller
+#    (CAPI core) siembra Calico en mgmt-child (label cni=calico-vxlan). Self-hosted calico-node (host-network)
+#    bootstrapea el CNI sin necesitar CNI (por eso CRS y no el helm del tigera-operator, que sí necesitaría CNI).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: child-cni
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/villadalmine/vcluster-idp.git
+    targetRevision: HEAD
+    path: clusters/cni
+    kustomize:
+      namespace: default     # el Cluster mgmt-child vive en default → el CRS debe estar en su mismo ns
+  destination:
+    server: https://kubernetes.default.svc   # host-mgmt mismo
+    namespace: default
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true   # los CRDs de Calico son grandes
+---
 # 1) CAAPH: host-mgmt instala ArgoCD DENTRO de mgmt-child (selector role=regional, igual que el Root).
 apiVersion: addons.cluster.x-k8s.io/v1alpha1
 kind: HelmChartProxy

@@ -15,6 +15,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENVIRONMENT="${PLATFORM_ENV:-dev}"
+REGION="${PLATFORM_REGION:-}"    # vacío = tenant CENTRALIZADO (Root); set = tenant REGIONAL (host <region>, ArgoCD propio)
 API_VERSION=""
 WEB_VERSION=""
 DOMAIN="${PLATFORM_DOMAIN:-example.local}"
@@ -60,6 +61,7 @@ shift 2 || true
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --env) ENVIRONMENT="$2"; shift 2;;
+    --region) REGION="$2"; shift 2;;
     --api-version) API_VERSION="$2"; shift 2;;
     --web-version) WEB_VERSION="$2"; shift 2;;
     --secret-backend) SECRET_BACKEND="$2"; shift 2;;
@@ -68,7 +70,14 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-TENANT_FILE="$REPO_ROOT/tenants/$ENVIRONMENT/$TENANT.yaml"
+# CENTRALIZADO (Root): tenants/<env>/<t>.yaml lo lee el ApplicationSet del Root.
+# REGIONAL (--region <r>): clusters/regions/<r>/tenants/<env>/<t>.yaml lo lee el ApplicationSet que corre
+# en el ArgoCD PROPIO del host <r> (descentralizado, sin SPOF). Mismo facade, misma fuente-de-verdad GitOps.
+if [[ -n "$REGION" ]]; then
+  TENANT_FILE="$REPO_ROOT/clusters/regions/$REGION/tenants/$ENVIRONMENT/$TENANT.yaml"
+else
+  TENANT_FILE="$REPO_ROOT/tenants/$ENVIRONMENT/$TENANT.yaml"
+fi
 VC_NS="vcluster-${TENANT}-${ENVIRONMENT}"   # vCluster namespace on the host (= Argo cluster name)
 
 # ── create: write the tenant.yaml (source of truth) and reconcile ───────────
