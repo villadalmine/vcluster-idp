@@ -87,6 +87,10 @@ validate-pod: ## Run E2E validation using a test pod for L7 checks (TENANT=... E
 showcase: ## Run the full read-only platform validation and showcase
 	@./cli/showcase-platform
 
+.PHONY: showcase-topology
+showcase-topology: ## Run the topology & hierarchy showcase
+	@./cli/showcase-topology
+
 
 
 .PHONY: template

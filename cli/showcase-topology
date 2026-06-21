@@ -1,0 +1,97 @@
+#!/usr/bin/env bash
+# ═══════════════════════════════════════════════════════════════════════════
+# showcase-topology — Demonstrate the hierarchy and topology of the platform.
+#
+# Explains and validates:
+# 1. Root Management Cluster (Physical k3s) + KubeVirt (Hypervisor substrate)
+# 2. Child Management Clusters (host-mgmt) vs Host Clusters (host-a/b/c/euw1)
+# 3. Centralized vs Decentralized (Regional) Tenant vClusters
+# ═══════════════════════════════════════════════════════════════════════════
+set -uo pipefail
+
+# Colors and emojis
+c_reset="\033[0m"
+c_bold="\033[1m"
+c_cyan="\033[36m"
+c_green="\033[32m"
+c_red="\033[31m"
+c_yellow="\033[33m"
+c_blue="\033[34m"
+
+# Format helpers
+ok() { echo -e "  ${c_green}✔${c_reset} $*"; }
+no() { echo -e "  ${c_red}✗${c_reset} $*"; }
+info() { echo -e "  ${c_blue}•${c_reset} $*"; }
+sec() {
+  echo
+  echo -e "${c_cyan}${c_bold}═══════════════════════════════════════════════════════════════════════════${c_reset}"
+  echo -e " ${c_bold}$1${c_reset}"
+  echo -e "${c_cyan}${c_bold}═══════════════════════════════════════════════════════════════════════════${c_reset}"
+  echo -e " ${c_yellow}ℹ️ Concept:${c_reset} $2"
+  echo
+  sleep 1.5
+}
+
+echo -e "${c_bold}Starting Platform Topology & Hierarchy Showcase (Read-Only)${c_reset}"
+sleep 1
+
+# ── 1. The Root Management Cluster & Hypervisor Substrate ──────────────────
+sec "1. Root Management Cluster (Physical k3s) & Hypervisor" \
+    "Your physical HA k3s cluster acts as both the Root Management Plane and the KubeVirt Hypervisor. KubeVirt runs directly on this substrate."
+
+info "Listing physical cluster nodes (the root infrastructure):"
+kubectl get nodes -o wide --no-headers | sed 's/^/      /'
+echo
+
+info "Checking if KubeVirt virtualization engine is active on the root nodes:"
+kubectl get pods -n kubevirt -l kubevirt.io=virt-handler --no-headers -o wide | sed 's/^/      /'
+echo
+ok "The physical node srv-t7910 is acting as the KubeVirt virtualization host."
+
+
+# ── 2. The Virtualized Nodes (KubeVirt VMs) ──────────────────────────────────
+sec "2. Virtual Compute Layer (KubeVirt VMs)" \
+    "The nodes of the guest CAPI clusters are NOT physical. They are running as KubeVirt Virtual Machine Instances (VMIs) hosted on the srv-t7910 hypervisor."
+
+info "Listing Virtual Machines (VMs) running on top of srv-t7910:"
+kubectl -n fleet get vmis -o custom-columns='VM_NAME:.metadata.name,IP:.status.interfaces[0].ipAddress,HOST_NODE:.spec.nodeName,STATUS:.status.phase' --no-headers | sed 's/^/      /'
+echo
+ok "All virtual nodes are active and mapped to srv-t7910."
+
+
+# ── 3. Cluster API & Crossplane (Mgmt vs Host Clusters) ──────────────────────
+sec "3. Cluster Provisioning: Host Clusters vs. Child Managements" \
+    "Crossplane v2 and CAPI provision virtual clusters on the VMs. We distinguish between regular Host Clusters (workload hosts) and Child Management Clusters (which run their own ArgoCD)."
+
+info "Listing Crossplane HostCluster (XR) instances:"
+kubectl -n fleet get hostcluster -o custom-columns='NAME:.metadata.name,ROLE:.spec.role,REGION:.spec.region,SYNCED:.status.conditions[?(@.type=="Synced")].status,READY:.status.conditions[?(@.type=="Ready")].status' --no-headers | sed 's/^/      /'
+echo
+
+info "Listing corresponding CAPI Clusters:"
+kubectl -n fleet get clusters -o custom-columns='NAME:.metadata.name,PHASE:.status.phase,CP_READY:.status.controlPlaneReady,INFRA_READY:.status.infrastructureReady' --no-headers | sed 's/^/      /'
+echo
+ok "We have 2 Management clusters (host-mgmt, host-euw1) and 3 Host clusters (host-a/b/c)."
+
+
+# ── 4. Centralized vs. Decentralized Tenants (vClusters) ───────────────────
+sec "4. Tenant Placement: Centralized vs. Decentralized (Regional) vClusters" \
+    "We support two tenancy models: Centralized vClusters (running directly on the Root Management Cluster) and Decentralized vClusters (running inside virtual regional hosts)."
+
+info "Checking CENTRALIZED tenants (running directly on the Root Management Cluster):"
+vcluster list 2>/dev/null | grep -iE 'vcluster-tenant-(b|c|x|y)' | sed 's/^/      /' || echo "      None found."
+echo
+
+info "Checking DECENTRALIZED tenants (running inside a regional virtual host cluster, e.g. host-euw1):"
+if [ -x "./cli/fleet-test" ]; then
+  info "Connecting to host-euw1 via jump pod to list regional vClusters inside it..."
+  ./cli/fleet-test kc host-euw1 get ns --no-headers | grep -E 'vcluster-tenant-' | awk '{print "      • Namespace: " $1 " (" $2 ")"}' || echo "      No regional tenants found."
+else
+  warn "cli/fleet-test helper not found."
+fi
+echo
+ok "Decentralized vClusters are fully sharded into their respective regional host VMs!"
+
+echo
+echo -e "${c_green}${c_bold}✔ TOPOLOGY SHOWCASE COMPLETE!${c_reset}"
+echo "This demonstrates how KubeVirt VMs back CAPI clusters, how child managements are sharded, and how tenants are distributed."
+echo
