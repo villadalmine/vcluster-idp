@@ -24,6 +24,11 @@ spec:
   template:
     metadata:
       name: "wl-{{.tenant.name}}-{{.tenant.environment}}"
+      # Delete NO-cascading (sin resources-finalizer): el workload del tenant corre DENTRO del vCluster.
+      # Al borrar el tenant, el vcluster-app (destino=host, alcanzable) borra el vCluster y con él TODO
+      # lo de adentro (incl. este workload). Si dejáramos el finalizer, su cleanup apuntaría al vCluster
+      # YA borrado (destino muerto) y el App quedaría colgado en Deleting para siempre. Ver ADR-13.
+      finalizers: []
       labels:
         platform.idp/tenant: "{{.tenant.name}}"
         platform.idp/environment: "{{.tenant.environment}}"

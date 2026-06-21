@@ -18,10 +18,13 @@ metadata:
 rules:
   - apiGroups: [""]
     resources: ["namespaces"]
-    verbs: ["get", "list"]
+    verbs: ["get", "list", "delete"]                       # list para registrar; delete para GC de ns vcluster-* huérfanos
   - apiGroups: [""]
     resources: ["secrets"]
-    verbs: ["get", "list", "create", "update", "patch"]   # leer vc-<ns>, escribir el cluster Secret en argocd
+    verbs: ["get", "list", "create", "update", "patch", "delete"]   # leer vc-<ns>, escribir/GC el cluster Secret en argocd
+  - apiGroups: ["apps"]
+    resources: ["statefulsets"]
+    verbs: ["get", "list"]                                 # detectar si el vCluster (StatefulSet) sigue vivo o quedó huérfano
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -85,4 +88,25 @@ spec:
                       {"tlsClientConfig":{"insecure":false,"caData":"$CA","certData":"$CERT","keyData":"$KEY"}}
                   EOF
                     echo "registrado $VC"
+                  done
+
+                  # ── GC del delete (reconciliación) ──────────────────────────────────────
+                  # Borrar un tenant prunea el vcluster-app, pero deja el ns vacío + su PVC (los PVC de
+                  # StatefulSet no se borran solos) + el cluster-secret de registro. El reconciliador los limpia:
+                  # 1) ns vcluster-* huérfano = sin StatefulSet del vCluster + sin pods + >120s de vida
+                  #    (el guard de edad evita borrar uno recién creándose) → borrar ns (cascadea PVC) + su secret.
+                  for ns in $(kubectl get ns -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | grep -E '^vcluster-' || true); do
+                    kubectl -n "$ns" get statefulset "$ns" >/dev/null 2>&1 && continue   # vCluster vivo → no tocar
+                    [ "$(kubectl -n "$ns" get pods --no-headers 2>/dev/null | wc -l)" -eq 0 ] || continue
+                    created="$(kubectl get ns "$ns" -o jsonpath='{.metadata.creationTimestamp}' 2>/dev/null || true)"
+                    [ -n "$created" ] || continue
+                    age=$(( $(date +%s) - $(date -d "$created" +%s 2>/dev/null || echo "$(date +%s)") ))
+                    [ "$age" -gt 120 ] || { echo "skip GC $ns (joven, ${age}s)"; continue; }
+                    echo "GC: ns $ns huerfano (vCluster borrado) -> borrando ns(+PVC) + registration secret"
+                    kubectl delete ns "$ns" --wait=false 2>/dev/null || true
+                    kubectl -n argocd delete secret "$ns" --ignore-not-found 2>/dev/null || true
+                  done
+                  # 2) registration secrets cuyo ns ya no existe → borrar
+                  for s in $(kubectl -n argocd get secret -l platform.idp/managed-by=vcluster-register -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null || true); do
+                    kubectl get ns "$s" >/dev/null 2>&1 || { echo "GC: registration secret $s (ns inexistente) -> borrando"; kubectl -n argocd delete secret "$s" --ignore-not-found 2>/dev/null || true; }
                   done
