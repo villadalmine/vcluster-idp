@@ -34,3 +34,23 @@ spec:
     configs:
       params:
         server.insecure: true   # homelab; detrás de un Gateway/ingress con TLS en prod
+      cm:
+        # Health-check custom para ClusterResourceSet. El default de ArgoCD marca Progressing si el CRS
+        # no tiene la condición ResourcesApplied=True — pero un CRS que NO matchea ningún cluster (un CNI
+        # alternativo declarado como opción, ej. calico-IPIP/cilium cuando el hijo usa calico-vxlan) nunca
+        # la obtiene, y quedaba arrastrando la app child-cni a Progressing para siempre. Acá: Healthy si
+        # aplicó O si no matchea (idle), y Degraded SÓLO ante un fallo real (ResourcesApplied=False).
+        "resource.customizations.health.addons.cluster.x-k8s.io_ClusterResourceSet": |
+          hs = { status = "Healthy", message = "No matching clusters (unused CRS) — idle" }
+          if obj.status ~= nil and obj.status.conditions ~= nil then
+            for _, c in ipairs(obj.status.conditions) do
+              if c.type == "ResourcesApplied" then
+                if c.status == "True" then
+                  hs.status = "Healthy"; hs.message = c.message or "ResourcesApplied"
+                elseif c.status == "False" then
+                  hs.status = "Degraded"; hs.message = c.message or "ResourcesApplied=False"
+                end
+              end
+            end
+          end
+          return hs
