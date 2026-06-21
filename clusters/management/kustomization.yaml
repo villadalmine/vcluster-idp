@@ -14,5 +14,17 @@ configMapGenerator:
   - name: region-root-eu-west1
     files:
       - region-root-eu-west1.yaml
+  - name: region-root-us-east1
+    files:
+      - region-root-us-east1.yaml
+  - name: region-root-us-west1
+    files:
+      - region-root-us-west1.yaml
+  - name: region-root-us-central1
+    files:
+      - region-root-us-central1.yaml
+  - name: region-root-eu-central1
+    files:
+      - region-root-eu-central1.yaml
 generatorOptions:
   disableNameSuffixHash: true   # el CRS referencia el ConfigMap por nombre exacto

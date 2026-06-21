@@ -1,0 +1,36 @@
+# El "region-root" de us-west1: app-of-apps que se SIEMBRA en el ArgoCD del cluster regional
+# (no se aplica en el management). Apunta DIRECTO a la base COMPARTIDA clusters/regions/_base y le
+# setea la región con kustomize.patches (REGION → us-west1). Es la ÚNICA pieza por-región: agregar
+# una región = copiar este archivo cambiando "us-west1". Ver clusters/regions/README.md
+# NO se aplica directo: kustomize lo empaqueta en el ConfigMap region-root-us-west1 y el
+# ClusterResourceSet lo inyecta en el cluster con label platform.idp/region=us-west1.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: region-root
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/villadalmine/vcluster-idp.git
+    targetRevision: HEAD
+    path: clusters/regions/_base          # base compartida; la región la pone el patch de abajo
+    kustomize:
+      patches:
+        - target: { group: argoproj.io, kind: ApplicationSet, name: vclusters-REGION }
+          patch: |-
+            - { op: replace, path: /metadata/name, value: vclusters-us-west1 }
+            - { op: replace, path: /spec/generators/0/git/files/0/path, value: "clusters/regions/us-west1/tenants/**/*.yaml" }
+            - { op: replace, path: /spec/template/metadata/labels/platform.idp~1region, value: us-west1 }
+        - target: { group: argoproj.io, kind: ApplicationSet, name: workloads-REGION }
+          patch: |-
+            - { op: replace, path: /metadata/name, value: workloads-us-west1 }
+            - { op: replace, path: /spec/generators/0/git/files/0/path, value: "clusters/regions/us-west1/tenants/**/*.yaml" }
+            - { op: replace, path: /spec/template/metadata/labels/platform.idp~1region, value: us-west1 }
+  destination:
+    server: https://kubernetes.default.svc   # el propio cluster regional
+    namespace: argocd
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions:
+      - CreateNamespace=true
