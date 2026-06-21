@@ -1,7 +1,9 @@
-# cert-manager DENTRO de los clusters role=management — prerequisito del cluster-api-operator (su webhook
-# usa Certificates). Va por separado (no como subchart del operator) porque el operator templatea su propio
-# Certificate y necesita los CRDs de cert-manager YA registrados; si van en el mismo release, race
-# ("no matches for kind Certificate"). CAAPH reintenta el operator hasta que cert-manager esté listo.
+# cert-manager = SERVICIO DE PLATAFORMA del fleet: se instala en TODOS los clusters (management Y
+# regional/host), igual que ArgoCD. Lo usan: el management para el webhook del CAPI operator (Certificates),
+# y los regional/host para el TLS de los Gateways de sus tenants. Va por separado (no como subchart del CAPI
+# operator) porque el operator templatea su propio Certificate y necesita los CRDs de cert-manager YA
+# registrados; si van en el mismo release, race ("no matches for kind Certificate"). CAAPH reintenta el
+# operator hasta que cert-manager esté listo.
 apiVersion: addons.cluster.x-k8s.io/v1alpha1
 kind: HelmChartProxy
 metadata:
@@ -9,8 +11,8 @@ metadata:
   namespace: fleet
 spec:
   clusterSelector:
-    matchLabels:
-      platform.idp/role: management
+    matchExpressions:
+      - { key: platform.idp/role, operator: In, values: [management, regional] }
   repoURL: https://charts.jetstack.io
   chartName: cert-manager
   version: "v1.16.2"
