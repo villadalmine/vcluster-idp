@@ -129,7 +129,7 @@ x "[ -n \"\$(vcluster connect '$NS' -n '$NS' -- kubectl get secret '$TENANT-post
 # ── Req 5 — version management ───────────────────────────────────────────────
 sec "Req 5 — version management"
 want=$(awk '/^[[:space:]]*api:/{f=1} f&&/version:/{gsub(/[" ]/,"",$2); print $2; exit}' "tenants/$ENV/$TENANT.yaml" 2>/dev/null)
-x "got=\$(vcluster connect '$NS' -n '$NS' -- kubectl get deploy '$TENANT-customer-api' -n '$VNS' -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null | tail -1 | sed 's/.*://'); [ -n \"$want\" ] && [ \"\$want\" = \"\$got\" ]" "api image tag = \$want (matches tenant.yaml)"
+x "got=\$(vcluster connect '$NS' -n '$NS' -- kubectl get deploy '$TENANT-customer-api' -n '$VNS' -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null | tail -1 | sed 's/.*://'); [ -n \"$want\" ] && [ \"\$want\" = \"\$got\" ]" "api image tag = $want (matches tenant.yaml)"
 
 # ── Req 6 — resource governance ─────────────────────────────────────────────
 sec "Req 6 — resource governance"
