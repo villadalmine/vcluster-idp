@@ -27,7 +27,16 @@ spec:
   valuesTemplate: |
     cert-manager:
       enabled: true          # host-mgmt no tiene cert-manager; el operator lo necesita
-    core: "cluster-api:v1.10.10"
-    bootstrap: "kubeadm:v1.10.10"
-    controlPlane: "kubeadm:v1.10.10"
-    infrastructure: "kubevirt:v0.10.5"   # CAPK v1beta1-contract (igual que el Root)
+    # Schema del chart 0.21.0 (verificado con `helm show values`): providers = objetos keyed por nombre.
+    core:
+      cluster-api:
+        version: v1.10.10
+    bootstrap:
+      kubeadm:
+        version: v1.10.10
+    controlPlane:
+      kubeadm:
+        version: v1.10.10
+    infrastructure:
+      kubevirt:
+        version: v0.10.5     # CAPK v1beta1-contract (igual que el Root)
