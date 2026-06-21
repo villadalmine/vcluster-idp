@@ -602,8 +602,7 @@ Our platform is architected to scale out using a multi-cluster fleet design rath
 *   **100 Tenants**: Distributed across 2–4 medium Host Clusters (e.g. sharded by environment or region).
 *   **1000 Tenants (Multi-Cluster Fleet)**: Distributed across a fleet of 10–20 Host Clusters managed by a dedicated **Management Cluster** running Cluster API (CAPI).
     *   **Referenced Diagrams**:
-        *   [`homelab-kubevirt-fleet.svg`](./homelab-kubevirt-fleet.svg) — Illustrates our homelab fleet topology where the management cluster controls Host Cluster VMs (`host-euw1`, etc.) via KubeVirt, each running its own local regional ArgoCD.
-        *   [`architecture-ideal-vs-homelab.svg`](./architecture-ideal-vs-homelab.svg) — Contrasts the single-host demo with the multi-cluster production fleet sharded over OpenStack/Bare Metal.
+        *   [`homelab-kubevirt-fleet.svg`](./homelab-kubevirt-fleet.svg) — how the homelab runs CAPI **without a pivot** (the cluster IS the management): `clusterctl init` in place → KubeVirt/CAPK boot VMs on `srv-t7910` → a real host cluster, each with its own regional ArgoCD.
     *   **Code Implementation Examples**:
         *   **Host Cluster Definitions**: Spawning a Host Cluster VM in a specific region is done declaratively via CAPI manifests, see [`clusters/homelab/host-euw1.yaml`](./clusters/homelab/host-euw1.yaml).
         *   **Infrastructure Composition**: Crossplane v2 is used to compose these host clusters, matching the custom platform API defined in [`fleet/config/crossplane-xrd.yaml`](./fleet/config/crossplane-xrd.yaml) to the CAPI resources defined in [`fleet/config/crossplane-composition.yaml`](./fleet/config/crossplane-composition.yaml).
