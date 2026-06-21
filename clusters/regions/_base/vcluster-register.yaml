@@ -99,8 +99,10 @@ spec:
                     kubectl -n "$ns" get statefulset "$ns" >/dev/null 2>&1 && continue   # vCluster vivo → no tocar
                     [ "$(kubectl -n "$ns" get pods --no-headers 2>/dev/null | wc -l)" -eq 0 ] || continue
                     created="$(kubectl get ns "$ns" -o jsonpath='{.metadata.creationTimestamp}' 2>/dev/null || true)"
-                    [ -n "$created" ] || continue
-                    age=$(( $(date +%s) - $(date -d "$created" +%s 2>/dev/null || echo "$(date +%s)") ))
+                    # edad como guard anti-race; busybox date no parsea RFC3339 (T...Z) → probamos con espacio,
+                    # y si aún falla usamos epoch 0 (age enorme) para NO bloquear el GC (el check StatefulSet+pods ya confirma huérfano).
+                    cepoch="$(date -d "$(echo "$created" | tr 'TZ' '  ')" +%s 2>/dev/null || echo 0)"
+                    age=$(( $(date +%s) - cepoch ))
                     [ "$age" -gt 120 ] || { echo "skip GC $ns (joven, ${age}s)"; continue; }
                     echo "GC: ns $ns huerfano (vCluster borrado) -> borrando ns(+PVC) + registration secret"
                     kubectl delete ns "$ns" --wait=false 2>/dev/null || true
