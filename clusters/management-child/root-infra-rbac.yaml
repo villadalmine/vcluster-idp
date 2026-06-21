@@ -1,0 +1,51 @@
+# Fase 2 — acceso "external-infra" del CAPK de host-mgmt al KubeVirt del Root.
+# El CAPK que corre EN host-mgmt usa este SA (vía un kubeconfig) para crear las VMs del cluster hijo
+# en ESTE cluster (el Root), namespace mgmt-child. Scope mínimo: KubeVirt VMs/VMIs + CDI DataVolumes +
+# Services/Secrets/PVCs en mgmt-child. (El kubeconfig con el token NO va en git — se crea one-off.)
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mgmt-child
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: capk-mgmt-child
+  namespace: mgmt-child
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: capk-mgmt-child
+  namespace: mgmt-child
+rules:
+  - apiGroups: ["kubevirt.io"]
+    resources: ["virtualmachines","virtualmachineinstances"]
+    verbs: ["create","get","list","watch","update","patch","delete"]
+  - apiGroups: ["subresources.kubevirt.io"]
+    resources: ["virtualmachineinstances/console","virtualmachines/start","virtualmachines/stop","virtualmachines/restart"]
+    verbs: ["get","update"]
+  - apiGroups: ["cdi.kubevirt.io"]
+    resources: ["datavolumes"]
+    verbs: ["create","get","list","watch","update","patch","delete"]
+  - apiGroups: [""]
+    resources: ["services","secrets","persistentvolumeclaims"]
+    verbs: ["create","get","list","watch","update","patch","delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: capk-mgmt-child
+  namespace: mgmt-child
+roleRef: { apiGroup: rbac.authorization.k8s.io, kind: Role, name: capk-mgmt-child }
+subjects:
+  - { kind: ServiceAccount, name: capk-mgmt-child, namespace: mgmt-child }
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: capk-mgmt-child-token
+  namespace: mgmt-child
+  annotations:
+    kubernetes.io/service-account.name: capk-mgmt-child
+type: kubernetes.io/service-account-token

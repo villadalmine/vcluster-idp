@@ -1,0 +1,156 @@
+# Cluster HIJO creado por host-mgmt (management-of-managements). Se aplica EN host-mgmt; su CAPK crea las
+# VMs en el KubeVirt del Root vía external-infra (KubevirtCluster.spec.infraClusterSecretRef → secret
+# mgmt-child-infra con el kubeconfig al Root). containerDisk (boot rápido) + masquerade + amd64/t7910.
+# Primero a mano para validar; luego se sirve por GitOps (CRS → ArgoCD de host-mgmt).
+apiVersion: cluster.x-k8s.io/v1beta1
+kind: Cluster
+metadata:
+  name: mgmt-child
+  namespace: default
+spec:
+  clusterNetwork:
+    pods:
+      cidrBlocks: ["10.244.0.0/16"]
+  controlPlaneRef:
+    apiVersion: controlplane.cluster.x-k8s.io/v1beta1
+    kind: KubeadmControlPlane
+    name: mgmt-child-control-plane
+  infrastructureRef:
+    apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
+    kind: KubevirtCluster
+    name: mgmt-child
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
+kind: KubevirtCluster
+metadata:
+  name: mgmt-child
+  namespace: default
+spec:
+  infraClusterSecretRef:            # ← external-infra: las VMs se crean en el Root (no en host-mgmt)
+    apiVersion: v1
+    kind: Secret
+    name: mgmt-child-infra
+    namespace: default
+  controlPlaneServiceTemplate:
+    spec:
+      type: ClusterIP
+---
+apiVersion: controlplane.cluster.x-k8s.io/v1beta1
+kind: KubeadmControlPlane
+metadata:
+  name: mgmt-child-control-plane
+  namespace: default
+spec:
+  replicas: 1
+  version: v1.31.5
+  machineTemplate:
+    infrastructureRef:
+      apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
+      kind: KubevirtMachineTemplate
+      name: mgmt-child-control-plane
+  kubeadmConfigSpec:
+    clusterConfiguration:
+      apiServer:
+        timeoutForControlPlane: 10m0s
+    initConfiguration:
+      nodeRegistration:
+        criSocket: unix:///var/run/containerd/containerd.sock
+    joinConfiguration:
+      nodeRegistration:
+        criSocket: unix:///var/run/containerd/containerd.sock
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
+kind: KubevirtMachineTemplate
+metadata:
+  name: mgmt-child-control-plane
+  namespace: default
+spec:
+  template:
+    spec:
+      virtualMachineTemplate:
+        metadata:
+          namespace: mgmt-child           # ns en el Root donde viven las VMs (el del SA/RBAC)
+        spec:
+          runStrategy: Always
+          template:
+            spec:
+              architecture: amd64
+              domain:
+                cpu: { cores: 2 }
+                memory: { guest: 4Gi }
+                devices:
+                  disks:
+                    - { name: containervolume, disk: { bus: virtio } }
+                  # SIN interfaces/networks custom: CAPK usa su default (bridge → IP única del pod por VM).
+                  # Si forzás masquerade, TODOS los nodos quedan con 10.0.2.2 → colisión → calico no rutea.
+              evictionStrategy: External
+              nodeSelector: { kubernetes.io/hostname: srv-t7910 }
+              volumes:
+                - name: containervolume
+                  containerDisk: { image: quay.io/capk/ubuntu-2404-container-disk:v1.31.5 }
+---
+apiVersion: cluster.x-k8s.io/v1beta1
+kind: MachineDeployment
+metadata:
+  name: mgmt-child-md-0
+  namespace: default
+spec:
+  clusterName: mgmt-child
+  replicas: 1
+  selector:
+    matchLabels: null
+  template:
+    spec:
+      clusterName: mgmt-child
+      version: v1.31.5
+      bootstrap:
+        configRef:
+          apiVersion: bootstrap.cluster.x-k8s.io/v1beta1
+          kind: KubeadmConfigTemplate
+          name: mgmt-child-md-0
+      infrastructureRef:
+        apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
+        kind: KubevirtMachineTemplate
+        name: mgmt-child-md-0
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
+kind: KubevirtMachineTemplate
+metadata:
+  name: mgmt-child-md-0
+  namespace: default
+spec:
+  template:
+    spec:
+      virtualMachineTemplate:
+        metadata:
+          namespace: mgmt-child
+        spec:
+          runStrategy: Always
+          template:
+            spec:
+              architecture: amd64
+              domain:
+                cpu: { cores: 2 }
+                memory: { guest: 4Gi }
+                devices:
+                  disks:
+                    - { name: containervolume, disk: { bus: virtio } }
+                  # SIN interfaces/networks custom: CAPK usa su default (bridge → IP única del pod por VM).
+                  # Si forzás masquerade, TODOS los nodos quedan con 10.0.2.2 → colisión → calico no rutea.
+              evictionStrategy: External
+              nodeSelector: { kubernetes.io/hostname: srv-t7910 }
+              volumes:
+                - name: containervolume
+                  containerDisk: { image: quay.io/capk/ubuntu-2404-container-disk:v1.31.5 }
+---
+apiVersion: bootstrap.cluster.x-k8s.io/v1beta1
+kind: KubeadmConfigTemplate
+metadata:
+  name: mgmt-child-md-0
+  namespace: default
+spec:
+  template:
+    spec:
+      joinConfiguration:
+        nodeRegistration:
+          criSocket: unix:///var/run/containerd/containerd.sock
