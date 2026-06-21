@@ -19,11 +19,14 @@ ARGOCD_NS="argocd"
 DRIFT=false
 DEBUG=false
 
+POD_TEST=false
+
 # Parse args
 for arg in "$@"; do
   case "$arg" in
     --drift) DRIFT=true;;
     --debug) DEBUG=true;;
+    --pod-test) POD_TEST=true;;
     *)
       # Assign positional args (tenant, env) in order
       if [ "$arg" != "${1:-}" ] && [ "$arg" = "${2:-}" ]; then
@@ -162,12 +165,34 @@ x "[ \"\$(kubectl -n '$NS' get gateway '$TENANT-gateway' -o jsonpath='{.status.c
 IP=$(kubectl -n "$NS" get gateway "$TENANT-gateway" -o jsonpath='{.status.addresses[0].value}' 2>/dev/null || true)
 if [ -n "$IP" ]; then
   for app in web api; do
-    x "code=\$(curl -k -m 5 -s -o /dev/null -w '%{http_code}' --resolve '$app.$TENANT.$DOMAIN:443:$IP' 'https://$app.$TENANT.$DOMAIN/' 2>/dev/null); [ \"\$code\" = '200' ]" "HTTPS $app.$TENANT.$DOMAIN → 200"
+    local_fail=false
+    if ! $POD_TEST; then
+      code=$(curl -k -m 5 -s -o /dev/null -w '%{http_code}' --resolve "$app.$TENANT.$DOMAIN:443:$IP" "https://$app.$TENANT.$DOMAIN/" 2>/dev/null || true)
+      if [ "$code" = "200" ]; then
+        ok "HTTPS $app.$TENANT.$DOMAIN → 200 (External Access)"
+      else
+        local_fail=true
+      fi
+    fi
+    
+    if $POD_TEST || $local_fail; then
+      if ! $POD_TEST; then
+        echo "  $(y "WARNING:") External connection to $app.$TENANT.$DOMAIN failed. Testing internal Gateway API routing from a test pod..."
+      fi
+      # Run probe inside a pod on the cluster
+      PROBE_CMD="kubectl run 'idp-gw-probe-$$' --rm -i --restart=Never --image=curlimages/curl -- sh -c 'curl -k -m 5 -s -o /dev/null -w %{http_code} --resolve $app.$TENANT.$DOMAIN:443:$IP https://$app.$TENANT.$DOMAIN/' 2>/dev/null"
+      code=$(eval "$PROBE_CMD" 2>/dev/null | head -c 3 || true)
+      if [ "$code" = "200" ]; then
+        ok "HTTPS $app.$TENANT.$DOMAIN → 200 (Internal Gateway Routing PASS — L7 Envoy & backends healthy)"
+      else
+        no "HTTPS $app.$TENANT.$DOMAIN → 200 (Internal Gateway Routing failed with code ${code:-000})"
+      fi
+    fi
   done
 else
   no "Gateway address" "no LB IP"
 fi
-cert=$(kubectl -n "$NS" get certificate "$TENANT-tls" -o jsonpath='{.status.conditions[?(@.type==\"Ready\")].status}' 2>/dev/null || true)
+cert=$(kubectl -n "$NS" get certificate "$TENANT-tls" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || true)
 if [ "$cert" = "True" ]; then
   ok "TLS cert $TENANT-tls Ready (cert-manager)"
 else

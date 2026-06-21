@@ -79,6 +79,10 @@ lint: ## Validate the repo YAML and the chart syntax
 validate: ## Run the E2E validation test catalog on the cluster (TENANT=... ENV=...)
 	@./cli/validate $(TENANT) $(ENV) $(FLAGS)
 
+.PHONY: validate-pod
+validate-pod: ## Run E2E validation using a test pod for L7 checks (TENANT=... ENV=...)
+	@./cli/validate $(TENANT) $(ENV) --pod-test $(FLAGS)
+
 
 
 .PHONY: template
