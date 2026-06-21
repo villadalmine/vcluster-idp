@@ -1,0 +1,60 @@
+%% Flujo completo del fleet: management-of-managements (Root → host-mgmt → mgmt-child)
+%% Qué CONSUME qué y qué se CONECTA con qué. Fuente del SVG (render: mmdc -i este.mermaid -o out.svg)
+flowchart TB
+  GIT["Git (villadalmine/vcluster-idp)\nfuente de verdad"]:::git
+
+  subgraph ROOT["ROOT k3s — MANAGEMENT + HYPERVISOR (nodos físicos)"]
+    direction TB
+    rArgo["ArgoCD central\n(platform-root)"]:::argo
+    rCAPI["CAPI + CAPK + Crossplane v2"]:::capi
+    rKV["KubeVirt + CDI + Longhorn\n(srv-t7910 = único KVM)"]:::kv
+    rCM["cert-manager"]:::svc
+    rCAAPH["CAAPH (HelmChartProxy)"]:::capi
+    rVC["7 vClusters centralizados\n(tenants a/b/c/x/y)"]:::vc
+  end
+
+  GIT --> rArgo
+  rArgo --> rCAPI & rKV & rCM & rCAAPH & rVC
+
+  %% Root CREA los host clusters como VMs
+  rCAPI -- "crea VMs (CAPK)" --> hEUW1
+  rCAPI -- "crea VMs (CAPK)" --> hMGMT
+  %% CAAPH del Root instala addons DENTRO de los clusters creados
+  rCAAPH -- "instala ArgoCD+cert-manager (role in mgmt,regional)\n+ CAPI (role=management)" --> hEUW1
+  rCAAPH -- "instala ArgoCD+cert-manager+CAPI" --> hMGMT
+  rCAPI -- "CRS: CNI calico-vxlan + region-root" --> hEUW1
+
+  subgraph EUW1["host-euw1 — WORKLOAD/REGIONAL (VMs en t7910)"]
+    eArgo["ArgoCD regional\n(region-root)"]:::argo
+    eVC["vCluster tenant-a\n(pg+api+web)"]:::vc
+    eArgo --> eVC
+  end
+
+  subgraph MGMT["host-mgmt — MANAGEMENT (VMs en t7910)"]
+    mArgo["ArgoCD"]:::argo
+    mCM["cert-manager"]:::svc
+    mCAPI["CAPI operator + providers\n(core/kubeadm/CAPK)"]:::capi
+    mSec["Secret mgmt-child-infra\n(kubeconfig al Root)"]:::sec
+    mCM --> mCAPI
+    mCAPI -. usa .-> mSec
+  end
+
+  %% host-mgmt CREA su hijo, pero las VMs van al KubeVirt del ROOT (external-infra)
+  mCAPI == "crea Cluster hijo (CAPK external-infra)" ==> CHILD
+  mSec -. "infraClusterSecretRef → apunta al" .-> rKV
+  CHILD -. "sus VMs corren en" .-> rKV
+
+  subgraph CHILD["mgmt-child — WORKLOAD creado por host-mgmt (VMs en t7910, ns mgmt-child del Root)"]
+    cCP["control-plane + worker\n(kubeadm)"]:::node
+    cCNI["calico-vxlan"]:::svc
+    cCP --> cCNI
+  end
+
+  classDef git fill:#222,color:#fff,stroke:#888
+  classDef argo fill:#1d4ed8,color:#fff
+  classDef capi fill:#0891b2,color:#fff
+  classDef kv fill:#b45309,color:#fff
+  classDef svc fill:#6d28d9,color:#fff
+  classDef vc fill:#059669,color:#fff
+  classDef node fill:#0d9488,color:#fff
+  classDef sec fill:#be123c,color:#fff
