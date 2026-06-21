@@ -26,7 +26,8 @@ spec:
     wait: true
   valuesTemplate: |
     cert-manager:
-      enabled: true          # host-mgmt no tiene cert-manager; el operator lo necesita
+      enabled: false         # se instala por separado (helmchartproxy-certmanager.yaml) para evitar el
+                             # race de CRDs; CAAPH reintenta este install hasta que cert-manager esté listo.
     # Schema del chart 0.21.0 (verificado con `helm show values`): providers = objetos keyed por nombre.
     core:
       cluster-api:

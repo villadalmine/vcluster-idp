@@ -1,0 +1,26 @@
+# cert-manager DENTRO de los clusters role=management — prerequisito del cluster-api-operator (su webhook
+# usa Certificates). Va por separado (no como subchart del operator) porque el operator templatea su propio
+# Certificate y necesita los CRDs de cert-manager YA registrados; si van en el mismo release, race
+# ("no matches for kind Certificate"). CAAPH reintenta el operator hasta que cert-manager esté listo.
+apiVersion: addons.cluster.x-k8s.io/v1alpha1
+kind: HelmChartProxy
+metadata:
+  name: cert-manager
+  namespace: fleet
+spec:
+  clusterSelector:
+    matchLabels:
+      platform.idp/role: management
+  repoURL: https://charts.jetstack.io
+  chartName: cert-manager
+  version: "v1.16.2"
+  releaseName: cert-manager
+  namespace: cert-manager
+  options:
+    install:
+      createNamespace: true
+    timeout: 10m
+    wait: true
+  valuesTemplate: |
+    crds:
+      enabled: true     # instala los CRDs de cert-manager (Certificate, Issuer, etc.)
