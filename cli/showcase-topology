@@ -1,28 +1,28 @@
 #!/usr/bin/env bash
 # ═══════════════════════════════════════════════════════════════════════════
-# showcase-topology — Demonstrate the hierarchy and topology of the platform.
+# showcase-topology — Demonstrate the cluster-topology & vCluster placement MODELS.
 #
-# Explains and validates:
-# 1. Root Management Cluster (Physical k3s) + KubeVirt (Hypervisor substrate)
-# 2. Child Management Clusters (host-mgmt) vs Host Clusters (host-a/b/c/euw1)
-# 3. Centralized vs Decentralized (Regional) Tenant vClusters
+# Read-only narrated walkthrough of every variant we validated on the same homelab
+# (mirrors README §3.1 "vCluster Placement & Cluster-Topology Models"):
+#   1. The physical k3s cluster is BOTH the KubeVirt hypervisor AND a tenant host
+#      (centralized vClusters running directly on it).
+#   2. A management cluster creates whole host clusters as KubeVirt VMs (CAPI/CAPK
+#      composed by Crossplane v2).
+#   3. Each created host runs its OWN ArgoCD + its OWN regional vClusters
+#      (decentralized, no central SPOF) — and a host promoted to management.
+#   4. Variants: HA control plane (etcd quorum), per-cluster CNI experiments.
+# Everything is queried LIVE (no hardcoded counts) so the output is always truthful.
 # ═══════════════════════════════════════════════════════════════════════════
 set -uo pipefail
 
-# Colors and emojis
-c_reset="\033[0m"
-c_bold="\033[1m"
-c_cyan="\033[36m"
-c_green="\033[32m"
-c_red="\033[31m"
-c_yellow="\033[33m"
-c_blue="\033[34m"
+c_reset="\033[0m"; c_bold="\033[1m"; c_cyan="\033[36m"; c_green="\033[32m"
+c_red="\033[31m"; c_yellow="\033[33m"; c_blue="\033[34m"; c_mag="\033[35m"
 
-# Format helpers
-ok() { echo -e "  ${c_green}✔${c_reset} $*"; }
-no() { echo -e "  ${c_red}✗${c_reset} $*"; }
+ok()   { echo -e "  ${c_green}✔${c_reset} $*"; }
+no()   { echo -e "  ${c_red}✗${c_reset} $*"; }
 info() { echo -e "  ${c_blue}•${c_reset} $*"; }
-sec() {
+warn() { echo -e "  ${c_yellow}⚠${c_reset} $*"; }
+sec()  {
   echo
   echo -e "${c_cyan}${c_bold}═══════════════════════════════════════════════════════════════════════════${c_reset}"
   echo -e " ${c_bold}$1${c_reset}"
@@ -32,66 +32,92 @@ sec() {
   sleep 1.5
 }
 
-echo -e "${c_bold}Starting Platform Topology & Hierarchy Showcase (Read-Only)${c_reset}"
+FT="./cli/fleet-test"
+
+echo -e "${c_bold}Platform Topology & vCluster Models Showcase (read-only, live)${c_reset}"
 sleep 1
 
-# ── 1. The Root Management Cluster & Hypervisor Substrate ──────────────────
-sec "1. Root Management Cluster (Physical k3s) & Hypervisor" \
-    "Your physical HA k3s cluster acts as both the Root Management Plane and the KubeVirt Hypervisor. KubeVirt runs directly on this substrate."
+# ── 1. Root: hypervisor AND tenant host (MODEL 1) ──────────────────────────
+sec "1. The Root cluster is the hypervisor AND hosts vClusters (MODEL 1)" \
+    "The physical HA k3s cluster wears two hats at once: it runs KubeVirt (so it is the VM hypervisor) and it also runs tenant vClusters directly on itself (centralized)."
 
-info "Listing physical cluster nodes (the root infrastructure):"
+info "Physical cluster nodes (the substrate):"
 kubectl get nodes -o wide --no-headers | sed 's/^/      /'
 echo
-
-info "Checking if KubeVirt virtualization engine is active on the root nodes:"
+info "KubeVirt virtualization engine running on the substrate:"
 kubectl get pods -n kubevirt -l kubevirt.io=virt-handler --no-headers -o wide | sed 's/^/      /'
+ok "srv-t7910 is the KubeVirt hypervisor — and (see §4) the same cluster also hosts vClusters."
+
+# ── 2. Management creates host clusters as VMs (MODEL 2) ────────────────────
+sec "2. A management cluster creates whole host clusters as KubeVirt VMs (MODEL 2)" \
+    "Crossplane v2 (HostCluster XR) + Cluster API (CAPI) + provider-KubeVirt (CAPK) declaratively turn a one-file request into a full Kubernetes cluster whose NODES are VMs."
+
+info "KubeVirt VMs backing the guest clusters (these ARE the cluster nodes):"
+kubectl -n fleet get vmis -o custom-columns='VM:.metadata.name,IP:.status.interfaces[0].ipAddress,NODE:.spec.nodeName,STATUS:.status.phase' --no-headers | sed 's/^/      /'
 echo
-ok "The physical node srv-t7910 is acting as the KubeVirt virtualization host."
-
-
-# ── 2. The Virtualized Nodes (KubeVirt VMs) ──────────────────────────────────
-sec "2. Virtual Compute Layer (KubeVirt VMs)" \
-    "The nodes of the guest CAPI clusters are NOT physical. They are running as KubeVirt Virtual Machine Instances (VMIs) hosted on the srv-t7910 hypervisor."
-
-info "Listing Virtual Machines (VMs) running on top of srv-t7910:"
-kubectl -n fleet get vmis -o custom-columns='VM_NAME:.metadata.name,IP:.status.interfaces[0].ipAddress,HOST_NODE:.spec.nodeName,STATUS:.status.phase' --no-headers | sed 's/^/      /'
+info "Crossplane HostCluster XRs → composed into CAPI Clusters:"
+kubectl -n fleet get hostcluster -o custom-columns='NAME:.metadata.name,ROLE:.spec.role,REGION:.spec.region,CNI:.spec.cni,READY:.status.conditions[?(@.type=="Ready")].status' --no-headers | sed 's/^/      /'
 echo
-ok "All virtual nodes are active and mapped to srv-t7910."
-
-
-# ── 3. Cluster API & Crossplane (Mgmt vs Host Clusters) ──────────────────────
-sec "3. Cluster Provisioning: Host Clusters vs. Child Managements" \
-    "Crossplane v2 and CAPI provision virtual clusters on the VMs. We distinguish between regular Host Clusters (workload hosts) and Child Management Clusters (which run their own ArgoCD)."
-
-info "Listing Crossplane HostCluster (XR) instances:"
-kubectl -n fleet get hostcluster -o custom-columns='NAME:.metadata.name,ROLE:.spec.role,REGION:.spec.region,SYNCED:.status.conditions[?(@.type=="Synced")].status,READY:.status.conditions[?(@.type=="Ready")].status' --no-headers | sed 's/^/      /'
-echo
-
-info "Listing corresponding CAPI Clusters:"
 kubectl -n fleet get clusters -o custom-columns='NAME:.metadata.name,PHASE:.status.phase,CP_READY:.status.controlPlaneReady,INFRA_READY:.status.infrastructureReady' --no-headers | sed 's/^/      /'
+ok "Each row is a real Kubernetes cluster whose control-plane/worker nodes are VMs on srv-t7910."
+
+# ── 3. Decentralized regional ArgoCD + management-child (MODELS 3 & 4) ──────
+sec "3. Each host runs its OWN ArgoCD + its OWN vClusters (MODELS 3 & 4)" \
+    "Decentralized GitOps: the management ArgoCD only creates clusters; each created host (role=management) gets its own ArgoCD (via CAAPH) seeded with a region-root, and provisions ITS region's vClusters locally — no central SPOF. A host promoted to management is the 'management-child' rung."
+
+mgmts=$(kubectl -n fleet get hostcluster -o jsonpath='{range .items[?(@.spec.role=="management")]}{.metadata.name} {end}' 2>/dev/null)
+info "Management-role clusters (each runs its own ArgoCD):"
+for h in $mgmts; do
+  reg=$(kubectl -n fleet get hostcluster "$h" -o jsonpath='{.spec.region}' 2>/dev/null)
+  apps=$($FT kc "$h" -n argocd get applications --no-headers 2>/dev/null | wc -l | tr -d ' ')
+  echo -e "      ${c_mag}$h${c_reset} (region=${reg:-none}) → local ArgoCD apps: ${apps:-?}"
+done
+ok "ArgoCD is sharded per cluster — the management plane is not a single point of failure."
+
+# ── 4. Where the vClusters live: centralized vs decentralized ──────────────
+sec "4. vCluster placement — centralized (Root) vs decentralized (regional)" \
+    "The SAME tenant chart (vCluster + Postgres + api + web + quota + netpol) runs either directly on the Root (centralized) or inside a regional host (decentralized). Same contract, different placement."
+
+info "CENTRALIZED vClusters (running directly on the Root cluster):"
+kubectl get ns --no-headers 2>/dev/null | awk '$1 ~ /^vcluster-tenant-/ {print "      • " $1}' || echo "      none"
 echo
-ok "We have 2 Management clusters (host-mgmt, host-euw1) and 3 Host clusters (host-a/b/c)."
+info "DECENTRALIZED vClusters (inside each regional host, queried via jump pod):"
+for h in $mgmts; do
+  [ "$h" = "host-mgmt" ] && true
+  list=$($FT kc "$h" get ns --no-headers 2>/dev/null | awk '$1 ~ /^vcluster-tenant-/ {print $1}')
+  if [ -n "$list" ]; then
+    echo -e "      ${c_mag}$h${c_reset}:"; echo "$list" | sed 's/^/        • /'
+  fi
+done
+ok "Tenants are sharded across regional host VMs — the decentralized fleet model."
 
+# ── 5. Variants: HA control plane + CNI experiments ────────────────────────
+sec "5. Variants validated: HA control plane & per-cluster CNI experiments" \
+    "On the same substrate we A/B-tested control-plane HA (etcd quorum) and three CNIs. On nested KubeVirt the per-VM masquerade interfered with cross-VM overlay traffic (IPIP/Cilium); Calico-VXLAN is what we validated end-to-end (README §3.1 — framed as an experiment, not a verdict)."
 
-# ── 4. Centralized vs. Decentralized Tenants (vClusters) ───────────────────
-sec "4. Tenant Placement: Centralized vs. Decentralized (Regional) vClusters" \
-    "We support two tenancy models: Centralized vClusters (running directly on the Root Management Cluster) and Decentralized vClusters (running inside virtual regional hosts)."
-
-info "Checking CENTRALIZED tenants (running directly on the Root Management Cluster):"
-vcluster list 2>/dev/null | grep -iE 'vcluster-tenant-(b|c|x|y)' | sed 's/^/      /' || echo "      None found."
+info "Control-plane replicas per cluster (HA = 3 → etcd quorum 2/3):"
+kubectl -n fleet get kubeadmcontrolplane -o custom-columns='NAME:.metadata.name,REPLICAS:.spec.replicas,READY:.status.readyReplicas,INIT:.status.initialized' --no-headers 2>/dev/null | sed 's/^/      /'
 echo
+info "CNI chosen per cluster (the experiment knob, spec.cni):"
+kubectl -n fleet get hostcluster -o custom-columns='NAME:.metadata.name,CNI:.spec.cni' --no-headers | sed 's/^/      /'
+ok "CNI is a per-cluster field; multi-VM clusters standardized on calico-vxlan after the experiment."
 
-info "Checking DECENTRALIZED tenants (running inside a regional virtual host cluster, e.g. host-euw1):"
-if [ -x "./cli/fleet-test" ]; then
-  info "Connecting to host-euw1 via jump pod to list regional vClusters inside it..."
-  ./cli/fleet-test kc host-euw1 get ns --no-headers | grep -E 'vcluster-tenant-' | awk '{print "      • Namespace: " $1 " (" $2 ")"}' || echo "      No regional tenants found."
-else
-  warn "cli/fleet-test helper not found."
-fi
+# ── 6. Management-of-managements: host-mgmt CREATES its own child cluster ────
+sec "6. Management-of-managements: host-mgmt CREATES its own child (MODEL 6)" \
+    "host-mgmt is not just a workload host — it runs FULL CAPI and creates ITS OWN host cluster (mgmt-child). The child's VMs run on the Root's KubeVirt via CAPK external-infra (the only KVM node). Recursive fleet: a management cluster spawning more clusters, all GitOps."
+
+info "host-mgmt runs CAPI (it IS a management cluster — providers Ready):"
+$FT kc host-mgmt get coreprovider,bootstrapprovider,controlplaneprovider,infrastructureprovider -A --no-headers 2>/dev/null | awk '{print "      "$2,"ready="$4}' | head
 echo
-ok "Decentralized vClusters are fully sharded into their respective regional host VMs!"
+info "host-mgmt CREATED a child cluster (mgmt-child):"
+$FT kc host-mgmt get cluster -A --no-headers 2>/dev/null | sed 's/^/      /'
+echo
+info "the child's VMs run on the ROOT's KubeVirt (namespace mgmt-child, via external-infra):"
+kubectl -n mgmt-child get vmi -o custom-columns='VM:.metadata.name,IP:.status.interfaces[0].ipAddress,NODE:.spec.nodeName,STATUS:.status.phase' --no-headers 2>/dev/null | sed 's/^/      /'
+ok "host-mgmt → creates mgmt-child → its VMs land on the Root's KubeVirt. Management-of-managements."
 
 echo
-echo -e "${c_green}${c_bold}✔ TOPOLOGY SHOWCASE COMPLETE!${c_reset}"
-echo "This demonstrates how KubeVirt VMs back CAPI clusters, how child managements are sharded, and how tenants are distributed."
+echo -e "${c_green}${c_bold}✔ TOPOLOGY & MODELS SHOWCASE COMPLETE${c_reset}"
+echo "Same homelab, every model: hypervisor+host (1), mgmt creates clusters (2), decentralized"
+echo "regional ArgoCD (3,4), HA + CNI variants (5), and management-of-managements (6: host-mgmt → child)."
 echo

@@ -44,6 +44,37 @@ Use these links to navigate directly to the code implementing each component of 
 
 ---
 
+## 1.5 Platform Components — what each piece is and how I apply it
+
+The platform is built from well-known CNCF building blocks. This table is the at-a-glance map: **what
+each component is, the exact role it plays here, where it lives in the repo, and which requirement /
+Design Question (DQ) it answers.** Read top-to-bottom it is the full request flow: a CLI commit → ArgoCD
+reconciles → Crossplane/CAPI build the host cluster → ArgoCD inside it builds the tenant.
+
+| Component | What it is | How I apply it in this platform | Where in the repo | Answers |
+|---|---|---|---|---|
+| **`platform` CLI** | Tenant lifecycle facade | `platform <tenant> create\|delete\|status` does **not** deploy imperatively — it writes & commits `tenants/<env>/<tenant>.yaml` (the source of truth) and lets GitOps reconcile. Idempotent, drift-aware "for free". | [`cli/platform`](./cli/platform) | Req 2, 9, 10, 11; DQ7 |
+| **ArgoCD** | GitOps engine | **Central** ArgoCD runs an app-of-apps (`platform-root`) + 4 ApplicationSets; **each regional cluster runs its OWN ArgoCD** (decentralized → no control-plane SPOF). | [`platform/`](./platform/) | DQ1, DQ3; Req 9–11 |
+| **ApplicationSet** | Templated app generator | Git generators read each tenant file and materialize **one vCluster + one workload (+route +ESO) per tenant** automatically. | [`applicationsets/`](./applicationsets/) | DQ2, DQ3 |
+| **Helm charts** | Packaging / golden path | `charts/tenant` = the whole tenant unit (namespace, ResourceQuota, LimitRange, CiliumNetworkPolicy, Secret, PostgreSQL, api, web). `charts/tenant-route` = Gateway + HTTPRoute + TLS. Onboarding an app = values, not platform changes. | [`charts/`](./charts/) | Req 3, 4, 5, 6; Infra-def |
+| **vCluster** | Per-tenant control plane | Each tenant gets an isolated virtual API server + etcd (shared-nodes by default) → no CRD/RBAC collisions; the isolation knob (spectrum from shared → dedicated → separate clusters). | [`vcluster/`](./vcluster/) | Req 1, 3; DQ6 |
+| **Crossplane v2** | Infra composition | A custom **`HostCluster` XR** (our own platform API) is composed into the CAPI object tree (each wrapped in a provider-kubernetes `Object` to hand ownership to CAPI). | [`fleet/config/`](./fleet/config/) | DQ1 |
+| **Cluster API + CAPK** | Cluster lifecycle | Turn a one-file `HostCluster` request into a **real Kubernetes cluster whose nodes are KubeVirt VMs**; declarative create/upgrade/delete of the fleet. | [`clusters/homelab/`](./clusters/homelab/), [`fleet/`](./fleet/) | DQ1 |
+| **KubeVirt + CDI** | Virtualization / storage | Runs guest-cluster nodes as VMs on the bare-metal node; CDI DataVolumes back the VM disks on Longhorn (HCI). | [`fleet/kubevirt/`](./fleet/kubevirt/) | DQ1 |
+| **ClusterResourceSet** | Bootstrap injector | Seeds the **CNI** and the **`region-root`** app into each freshly-created cluster (egg-and-chicken bootstrap). | [`clusters/cni/`](./clusters/cni/), [`clusters/management/`](./clusters/management/) | DQ1, DQ3 |
+| **CAAPH (HelmChartProxy)** | Addon delivery | Installs ArgoCD **into** every `role=management` cluster (too big for a CRS ConfigMap). | [`clusters/management/`](./clusters/management/) | DQ1, DQ3 |
+| **Cilium** | CNI + Gateway + policy | Host dataplane, `GatewayClass` for north-south access, and **default-deny `CiliumNetworkPolicy`** for cross-tenant isolation. | [`charts/tenant/templates/networkpolicy.yaml`](./charts/tenant/templates/networkpolicy.yaml) | Req 7, 12; DQ5, DQ6 |
+| **cert-manager** | TLS automation | Issues the Gateway TLS certificates (gateway-shim). | [`applicationsets/routes-appset.yaml`](./applicationsets/routes-appset.yaml) | Req 12; DQ5 |
+| **External Secrets (ESO)** | Secrets (opt-in) | Per-tenant in-cluster secret generation without storing material in Git (default is Helm-generated). | [`applicationsets/eso-appset.yaml`](./applicationsets/eso-appset.yaml) | Req 8; DQ6 |
+| **MachineHealthCheck** | Resilience | CAPI auto-remediates unhealthy worker Machines (declarative alternative to manual recovery). | [`clusters/homelab/machinehealthchecks.yaml`](./clusters/homelab/machinehealthchecks.yaml) | DQ1 (resilience) |
+
+> **One sentence:** the **CLI** commits intent to Git; **ArgoCD** reconciles it; **Crossplane + CAPI +
+> KubeVirt** build the host clusters; **CAAPH + ClusterResourceSet** give each cluster its own ArgoCD;
+> that ArgoCD uses **ApplicationSets + Helm charts + vCluster** to give every tenant an isolated
+> environment — all declarative, all GitOps. §3.1 shows the topology variants; §3.2 the failure modes.
+
+---
+
 ## 2. Quick Start: How to Run & Verify
 
 You can run and test this repository in two different modes depending on your local cluster capabilities:
@@ -457,6 +488,71 @@ Host cluster (Scope: Environment dev/acc/prod - Decentralized ArgoCD)
        ├─ ApplicationSet #2 (tenants-appset) -> deploys workload chart inside vClusters
        └─ ApplicationSet #3 (routes-appset) -> provisions Host Gateway API routes
 ```
+
+### 3.1 vCluster Placement & Cluster-Topology Models (variants demonstrated live)
+
+A core part of this exercise was exploring **where a tenant vCluster can live** and **who provisions
+the cluster that hosts it**. The same physical homelab was used to stand up and validate the full
+spectrum below. Each row is a distinct, real model — not a paper design — and maps to the scaling /
+multi-region / security Design Questions answered in §5.
+
+| # | Model / Variant | Who provisions the host & where the vCluster runs | Live example | Answers Design Question |
+|---|---|---|---|---|
+| 1 | **Hypervisor-cluster also hosts vClusters (centralized)** | The physical k3s cluster is *simultaneously* the KubeVirt **hypervisor** and the tenant host: the central ArgoCD provisions vClusters **directly on it**. The cluster wears both hats — substrate for VMs *and* multi-tenant control planes. | Root k3s runs **7 centralized vClusters** (`tenant-a/b/c/x/y`) + KubeVirt | Q1 (single-cluster / ~10 tenants) |
+| 2 | **Management cluster creates host clusters (CAPI/CAPK on KubeVirt)** | A management cluster declaratively creates **whole Kubernetes host clusters as KubeVirt VMs** via Cluster API + provider-KubeVirt (CAPK), composed by **Crossplane v2** (`HostCluster` XR). | Root creates **5 host clusters** as VMs on `srv-t7910` | Q1 (Cluster API + Crossplane + fleet) |
+| 3 | **Decentralized regional fleet (no central SPOF)** | Each created host cluster (`role=regional`) runs its **own ArgoCD** (seeded by a CAPI `ClusterResourceSet` → `region-root`) and hosts **its own** regional vClusters. The central ArgoCD never deploys tenants cross-cluster. | `host-euw1` (eu-west1): local ArgoCD + `vcluster-tenant-a` (pg+api+web) | Q1 (100/1000 multi-cluster), Q3 (GitOps), Q5 (multi-region) |
+| 4 | **Management-of-managements (a cluster that creates clusters)** | `host-mgmt` (`role=management`) runs its **own full CAPI** (operator + providers, installed by CAAPH) and **creates its OWN child host cluster** (`mgmt-child`). The child's VMs run on the **Root's** KubeVirt via **CAPK external-infra** (`infraClusterSecretRef`), since that is the only KVM node. Recursive fleet, end-to-end GitOps. | `host-mgmt` → created `mgmt-child` (CP+worker Ready) | Q1 (hierarchical fleet management) |
+| 5 | **HA control plane host cluster** | A host cluster with **3 control-plane replicas / etcd quorum** (2-of-3), vs the single-CP default. | demonstrated on a 3-CP host cluster (etcd quorum forms once on calico-vxlan) | Q1 (production resilience) |
+| 6 | **Per-cluster CNI variants (an experiment)** | The CNI is selectable per cluster via the `cni` field: **Calico (IPIP)**, **Cilium**, **Calico-VXLAN**. We A/B'd all three on nested KubeVirt and **converged on Calico-VXLAN** for multi-VM clusters (see the note below). | all multi-VM clusters on `calico-vxlan` | Q5/Q6 (networking) |
+| 7 | **vCluster isolation spectrum** | vCluster tenancy from **shared-nodes** (default, soft multi-tenancy) → dedicated/private nodes → fully separate clusters (the 9-model spectrum). Network isolation enforced by host-side `CiliumNetworkPolicy` default-deny. | shared-nodes live; deeper rungs designed (ADR-16) | Q6 (security, vCluster risks, isolation) |
+| 8 | **HCI storage for VM disks** | We moved from ephemeral **containerDisk** to **CDI DataVolumes on Longhorn** (`storageClassName: longhorn-vm`) for **all** host clusters — CDI imports the cloud image into a replicated Longhorn PVC, so a VM disk **survives a node reboot** (treating the homelab like vSAN/HCI). | all host clusters on Longhorn DataVolumes | Q1 (production storage) |
+
+> **A note on nested-KubeVirt networking (empirical, two separate layers).** Multi-node guest clusters
+> on nested KubeVirt hit cross-node failures (workers never joining, etcd not reaching quorum). Two
+> distinct things matter:
+> 1. **VM network binding — use `bridge`, not `masquerade`.** With KubeVirt **masquerade**, *every* VM
+>    is NAT'd to the **same** internal IP `10.0.2.2`, so all the guest's nodes report the **same
+>    InternalIP** → they collide and cross-node routing/CNI breaks (the worker stays `NotReady`,
+>    `install-cni` fails). The fix is **bridge** (CAPK's default when you set no `interfaces`/`networks`):
+>    each VM gets a **unique pod-network IP** (`10.0.6.x`) → unique node IPs. All our working clusters use
+>    bridge; this was the real root cause of the multi-node breakage.
+> 2. **CNI overlay — `Calico-VXLAN` (UDP 4789).** On top of unique IPs, VXLAN is the dataplane we
+>    validated end-to-end for the guest's pod overlay. We did not exhaustively tune the Cilium path
+>    (MTU, `kubeProxyReplacement`) once VXLAN worked — an open avenue, not a dead end.
+>
+> *(Honest correction: an earlier draft blamed "masquerade dropping IPIP packets". The actual multi-node
+> blocker is the masquerade IP collision above; the working clusters never used masquerade.)*
+
+> 📊 **Flow diagram:** [`flow-management-of-managements.svg`](./flow-management-of-managements.svg)
+> (source: `.mermaid`) — the full graph of what consumes/connects to what: Git → ArgoCD → CAPI/KubeVirt →
+> host clusters → CAAPH/CRS addons → vClusters, plus `host-mgmt` creating `mgmt-child` via external-infra.
+
+### 3.2 Resilience & Node-Failure (honest limitation + production answer)
+
+During this work the single physical KVM host (`srv-t7910`) crashed, which took **every** nested host
+cluster down at once. That is a real **single point of failure**, and it is worth stating plainly:
+
+- **Why it happens:** all guest-cluster VMs are pinned to the one x86/KVM-capable node. There is no VM
+  failover. Even the "HA" host cluster (3 control-plane replicas) stacks all 3 CP VMs on that *same*
+  physical box — so it is HA against a process/VM failure, **not** against the node itself dying
+  (etcd quorum across 3 VMs on one host is illusory for node-loss).
+- **Recovery (what we actually observed — honest):** every VM disk is a **CDI DataVolume on Longhorn**
+  (`longhorn-vm`), so the **disk persists** the node crash. But persistence of the disk is **not** the
+  same as a clean control-plane recovery: when we cold-booted the crashed VMs in place, the guest
+  **etcd/api-server did not come back healthy** (KubeadmControlPlane stayed `0/1`, api-server
+  unreachable). The reliable fix was to **rebuild** those clusters via GitOps (`git rm` the HostCluster →
+  let the teardown finish → re-add → ArgoCD/CAPI recreate them clean). So the lesson is nuanced:
+  DataVolume saves the *bytes*, but a control plane that died with its node is best **re-provisioned**,
+  not resurrected. (Freshly-provisioned clusters were healthy immediately; only the in-place cold-boots
+  were not.)
+- **Automated remediation:** a CAPI **`MachineHealthCheck`** ([`clusters/homelab/machinehealthchecks.yaml`](./clusters/homelab/machinehealthchecks.yaml))
+  detects unhealthy worker Machines and recreates them declaratively (no manual pod deletion). It is
+  intentionally scoped to **workers** (recreating a control-plane mid-flap can strand the immutable
+  `controlPlaneEndpoint`) with long timeouts to avoid churn on the flaky nested network.
+- **Production answer:** multiple hypervisor nodes; `evictionStrategy: LiveMigrate` + replicated
+  storage to drain a failing node; DataVolume-backed disks everywhere; `MachineHealthCheck` with a
+  tuned `maxUnhealthy` (≈40%) so a node loss remediates only its share and short-circuits fleet-wide
+  outages; and a control plane spread **across** physical nodes.
 
 ### Key Design Decison Records (ADRs)
 *   **Decentralized GitOps (ADR-02 / ADR-13)**: To eliminate single points of failure (SPOF) and acotate blast radius, each host cluster runs its own local ArgoCD. The management cluster only handles CAPI VM creation and seeds the local ArgoCDs.
