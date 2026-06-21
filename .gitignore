@@ -8,5 +8,6 @@ charts/tenant/Chart.lock
 
 # Docs en markdown: por ahora NO se publican (se decide cuáles más adelante).
 # Para incluir uno puntual: git add -f <archivo>.md  (o sacar esta regla).
+!README.md
 *.md
 
