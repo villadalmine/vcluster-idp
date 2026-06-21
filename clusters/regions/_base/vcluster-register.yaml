@@ -25,6 +25,9 @@ rules:
   - apiGroups: ["apps"]
     resources: ["statefulsets"]
     verbs: ["get", "list"]                                 # detectar si el vCluster (StatefulSet) sigue vivo o quedó huérfano
+  - apiGroups: ["argoproj.io"]
+    resources: ["applications"]
+    verbs: ["get", "list", "patch"]                        # destrabar wl-apps colgados en Deleting (destino vCluster ya borrado)
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -111,4 +114,16 @@ spec:
                   # 2) registration secrets cuyo ns ya no existe → borrar
                   for s in $(kubectl -n argocd get secret -l platform.idp/managed-by=vcluster-register -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null || true); do
                     kubectl get ns "$s" >/dev/null 2>&1 || { echo "GC: registration secret $s (ns inexistente) -> borrando"; kubectl -n argocd delete secret "$s" --ignore-not-found 2>/dev/null || true; }
+                  done
+                  # 3) wl-apps colgados en Deleting porque su vCluster destino ya no existe → sacar el finalizer.
+                  #    El appset-controller FUERZA el resources-finalizer (ignora finalizers:[] del template); al borrar
+                  #    el tenant, el vcluster-app prunea el vCluster y el finalizer del wl-app cuelga contra un destino
+                  #    muerto. Como el workload vive DENTRO del vCluster (ya borrado), el cleanup es moot → sacar finalizer.
+                  for app in $(kubectl -n argocd get applications -l platform.idp/layer=workload -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null || true); do
+                    [ -n "$(kubectl -n argocd get application "$app" -o jsonpath='{.metadata.deletionTimestamp}' 2>/dev/null || true)" ] || continue
+                    dest="$(kubectl -n argocd get application "$app" -o jsonpath='{.spec.destination.name}' 2>/dev/null || true)"
+                    if [ -n "$dest" ] && ! kubectl -n argocd get secret "$dest" >/dev/null 2>&1; then
+                      echo "GC: wl-app $app colgado (destino $dest sin registro) -> removiendo finalizer"
+                      kubectl -n argocd patch application "$app" --type=json -p '[{"op":"remove","path":"/metadata/finalizers"}]' 2>/dev/null || true
+                    fi
                   done

@@ -24,10 +24,11 @@ spec:
   template:
     metadata:
       name: "wl-{{.tenant.name}}-{{.tenant.environment}}"
-      # Delete NO-cascading (sin resources-finalizer): el workload del tenant corre DENTRO del vCluster.
-      # Al borrar el tenant, el vcluster-app (destino=host, alcanzable) borra el vCluster y con él TODO
-      # lo de adentro (incl. este workload). Si dejáramos el finalizer, su cleanup apuntaría al vCluster
-      # YA borrado (destino muerto) y el App quedaría colgado en Deleting para siempre. Ver ADR-13.
+      # Intento de delete NO-cascading: el workload corre DENTRO del vCluster, así que al borrar el tenant
+      # el vcluster-app borra el vCluster y con él el workload — el finalizer del wl-app colgaría contra el
+      # vCluster ya borrado (destino muerto). NOTA: el appset-controller IGNORA este finalizers:[] y fuerza
+      # igual el resources-finalizer; por eso el safety-net real es el GC del CronJob vcluster-register, que
+      # destraba los wl-apps colgados (saca el finalizer cuando el destino ya no está registrado). Ver ADR-13.
       finalizers: []
       labels:
         platform.idp/tenant: "{{.tenant.name}}"
