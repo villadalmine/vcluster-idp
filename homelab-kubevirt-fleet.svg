@@ -1,0 +1,92 @@
+<svg viewBox="0 0 900 820" xmlns="http://www.w3.org/2000/svg" role="img" font-family="ui-sans-serif, system-ui, sans-serif">
+  <title>Homelab fleet path — your cluster IS the management (no pivot): KubeVirt + CAPK + Crossplane v2</title>
+  <desc>Your existing homelab k3s cluster is both management and host. clusterctl init adds the Cluster API CRDs and controllers in place (no pivot). KubeVirt + CAPK + Crossplane v2 are installed via Ansible or as a GitOps addon. Applying a namespaced HostCluster XR makes Crossplane compose the CAPI objects, CAPK boots VMs on srv-t7910, and kubeadm forms a real workload Kubernetes cluster.</desc>
+  <style>
+    text{fill:#1a1a1a} .sub{fill:#5a5a5a} .info{fill:#1f6feb} .grn{fill:#15803d} .amb{fill:#b45309} .red{fill:#b91c1c}
+    .p{fill:rgba(130,130,130,0.10)} .b{fill:rgba(130,130,130,0.07)} rect{stroke:#c9c9c9}
+    .bi{stroke:#1f6feb} .bg{stroke:#15803d} .ba{stroke:#b45309} .br{stroke:#b91c1c} line{stroke:#888}
+    @media (prefers-color-scheme:dark){text{fill:#e6e6e6}.sub{fill:#a0a0a0}.info{fill:#58a6ff}.grn{fill:#4ade80}.amb{fill:#fbbf24}.red{fill:#f87171}rect{stroke:#444}.bi{stroke:#58a6ff}.bg{stroke:#4ade80}.ba{stroke:#fbbf24}.br{stroke:#f87171}}
+  </style>
+  <defs><marker id="a" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#888"/></marker></defs>
+
+  <text x="20" y="28" font-size="16" font-weight="700">Homelab fleet path — your cluster IS the management (no pivot)</text>
+
+  <!-- Existing cluster -->
+  <rect x="40" y="44" width="820" height="118" rx="10" class="b bi"/>
+  <text x="54" y="63" font-size="11.5" font-weight="700" class="info">YOUR EXISTING HOMELAB CLUSTER = MANAGEMENT + HOST (collapsed)</text>
+  <rect x="56" y="72" width="248" height="76" rx="8" class="p"/>
+  <text x="68" y="90" font-size="10.5" font-weight="700">k3s · 3-master etcd HA</text>
+  <text x="68" y="106" font-size="9.5" class="sub">super6c-01/02/04 · quorum 2/3</text>
+  <text x="68" y="120" font-size="9.5" class="sub">+ RK1 / Pi / t7910 agents</text>
+  <text x="68" y="138" font-size="9.5" class="sub">HAProxy VIP .130</text>
+  <rect x="316" y="72" width="270" height="76" rx="8" class="p ba"/>
+  <text x="328" y="90" font-size="10.5" font-weight="700" class="amb">ArgoCD + addons</text>
+  <text x="328" y="106" font-size="9.5" class="sub">cilium · cert-manager · ESO</text>
+  <text x="328" y="120" font-size="9.5" class="sub">gateway · HAMi · prometheus</text>
+  <text x="328" y="138" font-size="9.5" class="sub">vClusters = tenants (Helm)</text>
+  <rect x="598" y="72" width="248" height="76" rx="8" class="p br"/>
+  <text x="610" y="90" font-size="10.5" font-weight="700" class="red">NO pivot</text>
+  <text x="610" y="106" font-size="9.5" class="sub">el cluster YA existe → ES el</text>
+  <text x="610" y="120" font-size="9.5" class="sub">management. No kind, no</text>
+  <text x="610" y="138" font-size="9.5" class="sub">clusterctl move.</text>
+  <line x1="450" y1="162" x2="450" y2="186" marker-end="url(#a)"/>
+
+  <!-- Step 1: teach CAPI -->
+  <rect x="40" y="188" width="820" height="148" rx="10" class="b bi"/>
+  <text x="54" y="207" font-size="11.5" font-weight="700" class="info">&#9312; Enseñarle CAPI al cluster (in place) — instala CRDs + controllers, NO pivot</text>
+  <rect x="56" y="216" width="380" height="70" rx="8" class="p"/>
+  <text x="68" y="234" font-size="10" font-weight="700">clusterctl init → providers (CRDs+controllers):</text>
+  <text x="68" y="250" font-size="9.5" class="sub">core: Cluster · Machine · MachineDeployment</text>
+  <text x="68" y="264" font-size="9.5" class="sub">bootstrap + control-plane: kubeadm</text>
+  <text x="68" y="278" font-size="9.5" class="sub">infra: CAPK (KubevirtCluster · KubevirtMachineTemplate)</text>
+  <rect x="448" y="216" width="398" height="70" rx="8" class="p"/>
+  <text x="460" y="234" font-size="10" font-weight="700">+ KubeVirt operator (VMs en t7910) + Crossplane v2</text>
+  <text x="460" y="250" font-size="9.5" class="sub">KubeVirt: virt-handler pinneado a srv-t7910 (único KVM)</text>
+  <text x="460" y="264" font-size="9.5" class="sub">Crossplane v2.3 + function-patch-and-transform</text>
+  <text x="460" y="278" font-size="9.5" class="sub">+ RBAC para componer recursos CAPI</text>
+  <!-- two install forms -->
+  <rect x="56" y="294" width="790" height="34" rx="8" class="p bg"/>
+  <text x="68" y="308" font-size="10" font-weight="700" class="grn">Dos formas (igual que KubeVirt):</text>
+  <text x="232" y="308" font-size="9.5" class="sub">(a) Ansible imperativo — fleet-kubevirt.yml (corre clusterctl init)</text>
+  <text x="232" y="322" font-size="9.5" class="sub">(b) GitOps/addon declarativo — Cluster API Operator + Provider CRs en platform/addons (ArgoCD los maneja, sin clusterctl)</text>
+  <line x1="450" y1="336" x2="450" y2="360" marker-end="url(#a)"/>
+
+  <!-- Step 2: request -->
+  <rect x="40" y="362" width="820" height="104" rx="10" class="b bg"/>
+  <text x="54" y="381" font-size="11.5" font-weight="700" class="grn">&#9313; Pedir un host cluster — kubectl apply HostCluster (XR v2, namespaced, SIN claim)</text>
+  <rect x="56" y="390" width="250" height="64" rx="8" class="p bg"/>
+  <text x="68" y="408" font-size="10" font-weight="700" class="grn">HostCluster XR (v2)</text>
+  <text x="68" y="423" font-size="9.5" class="sub">namespaced · es el request</text>
+  <text x="68" y="438" font-size="9.5" class="sub">spec: k8sVersion, replicas, cpu…</text>
+  <line x1="306" y1="422" x2="338" y2="422" marker-end="url(#a)"/>
+  <rect x="340" y="390" width="240" height="64" rx="8" class="p bi"/>
+  <text x="352" y="408" font-size="10" font-weight="700" class="info">Crossplane Composition</text>
+  <text x="352" y="423" font-size="9.5" class="sub">pipeline (function-pnt)</text>
+  <text x="352" y="438" font-size="9.5" class="sub">compone el Cluster CAPI directo</text>
+  <line x1="580" y1="422" x2="612" y2="422" marker-end="url(#a)"/>
+  <rect x="614" y="390" width="232" height="64" rx="8" class="p"/>
+  <text x="626" y="408" font-size="10" font-weight="700">Objetos CAPI</text>
+  <text x="626" y="423" font-size="9.5" class="sub">Cluster · KubevirtCluster · KCP</text>
+  <text x="626" y="438" font-size="9.5" class="sub">MachineDeployment · templates</text>
+  <line x1="450" y1="466" x2="450" y2="490" marker-end="url(#a)"/>
+
+  <!-- Step 3: VMs -->
+  <rect x="40" y="492" width="820" height="96" rx="10" class="b ba"/>
+  <text x="54" y="511" font-size="11.5" font-weight="700" class="amb">&#9314; CAPK + KubeVirt bootean las VMs en srv-t7910 → un k8s real (workload cluster)</text>
+  <rect x="56" y="520" width="380" height="56" rx="8" class="p"/>
+  <text x="68" y="538" font-size="10" font-weight="700">VMs (virt-launcher pods) en srv-t7910</text>
+  <text x="68" y="553" font-size="9.5" class="sub">1 control-plane VM + N worker VMs (container-disk)</text>
+  <text x="68" y="567" font-size="9.5" class="sub">kubeadm las une → API propia, etcd propio</text>
+  <rect x="448" y="520" width="398" height="56" rx="8" class="p bg"/>
+  <text x="460" y="538" font-size="10" font-weight="700" class="grn">workload cluster = host cluster real y separado</text>
+  <text x="460" y="553" font-size="9.5" class="sub">clusterctl get kubeconfig → instalar CNI (Calico/Cilium)</text>
+  <text x="460" y="567" font-size="9.5" class="sub">después: su propio ArgoCD + addons (ClusterResourceSet)</text>
+
+  <!-- legend -->
+  <text x="20" y="616" font-size="12" font-weight="700">Las dos preguntas que cierra este diagrama:</text>
+  <text x="30" y="636" font-size="10.8"><tspan class="red" font-weight="700">¿Sin pivot cómo funciona CAPI?</tspan><tspan class="sub"> clusterctl init sólo INSTALA YAML (CRDs + controllers) en tu cluster. El pivot es exclusivo del</tspan></text>
+  <text x="30" y="652" font-size="10.8" class="sub">caso huevo-gallina (bootstrapeás en un kind descartable y movés los objetos). Tu cluster ya existe → init le agrega CAPI in place.</text>
+  <text x="30" y="674" font-size="10.8"><tspan class="info" font-weight="700">¿Qué instalo para que "entienda" CAPI?</tspan><tspan class="sub"> las CRDs (clusters.cluster.x-k8s.io, kubevirtclusters…) + sus controllers. Eso es</tspan></text>
+  <text x="30" y="690" font-size="10.8" class="sub">lo que hace el rol install-capi (Ansible) — o el Cluster API Operator si lo querés declarativo en GitOps. Mismo resultado, dos caminos.</text>
+  <text x="30" y="712" font-size="10.8"><tspan class="grn" font-weight="700">Resultado:</tspan><tspan class="sub"> de un solo cluster homelab provisionás clusters k8s reales y separados como VMs — el modelo fleet, corrible.</tspan></text>
+</svg>

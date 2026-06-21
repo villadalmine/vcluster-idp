@@ -1,0 +1,103 @@
+<svg viewBox="0 0 900 1030" xmlns="http://www.w3.org/2000/svg" role="img" font-family="ui-sans-serif, system-ui, sans-serif">
+  <title>Ideal (fleet with CAPI+Crossplane) vs Homelab (single collapsed cluster)</title>
+  <desc>Two architectures. Ideal: a management cluster with ArgoCD+CAPI+Crossplane creates host clusters; each host has its own ArgoCD that installs platform/addons and the vClusters (tenants) with Helm. Homelab: a single cluster acts as management+host, one ArgoCD installs addons and vClusters with Helm, CAPI/Crossplane stay as future code.</desc>
+  <style>
+    text{fill:#1a1a1a} .sub{fill:#5a5a5a} .info{fill:#1f6feb} .grn{fill:#15803d} .amb{fill:#b45309}
+    .p{fill:rgba(130,130,130,0.10)} .b{fill:rgba(130,130,130,0.07)} rect{stroke:#c9c9c9}
+    .bi{stroke:#1f6feb} .bg{stroke:#15803d} .ba{stroke:#b45309} line{stroke:#888}
+    @media (prefers-color-scheme:dark){text{fill:#e6e6e6}.sub{fill:#a0a0a0}.info{fill:#58a6ff}.grn{fill:#4ade80}.amb{fill:#fbbf24}rect{stroke:#444}.bi{stroke:#58a6ff}.bg{stroke:#4ade80}.ba{stroke:#fbbf24}}
+  </style>
+  <defs><marker id="a" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#888"/></marker></defs>
+
+  <text x="22" y="28" font-size="16" font-weight="700">&#9312; IDEAL — production / fleet</text>
+  <rect x="290" y="42" width="120" height="32" rx="7" class="p"/>
+  <text x="350" y="62" text-anchor="middle" font-size="11.5" font-weight="700">Git (repos)</text>
+  <rect x="430" y="38" width="410" height="40" rx="7" class="p br"/>
+  <text x="442" y="55" font-size="10.5" font-weight="700" class="red">BOOTSTRAP PROCESS &#8212; imperative, one-time (Ansible / Terraform / clusterctl in CI)</text>
+  <text x="442" y="70" font-size="9" class="sub">kind &#8594; pivot (clusterctl move) &#183; installs ArgoCD-mgmt + ESO/Sealed/SOPS &#183; seeds first provider creds</text>
+  <line x1="635" y1="78" x2="560" y2="88" marker-end="url(#a)"/>
+
+  <rect x="60" y="88" width="780" height="118" rx="10" class="b bi"/>
+  <text x="74" y="106" font-size="11.5" font-weight="700" class="info">MANAGEMENT CLUSTER (control plane of control planes) — created by the bootstrap process above (kind + pivot), then self-sufficient</text>
+  <rect x="78" y="116" width="232" height="80" rx="8" class="p ba"/>
+  <text x="90" y="134" font-size="11" font-weight="700" class="amb">ArgoCD (mgmt)</text>
+  <text x="90" y="150" font-size="10" class="sub">delivers HostCluster Claims</text>
+  <text x="90" y="164" font-size="10" class="sub">+ seeds ArgoCD on each cluster</text>
+  <text x="90" y="184" font-size="10" class="sub">(ClusterResourceSet)</text>
+  <rect x="320" y="116" width="210" height="80" rx="8" class="p"/>
+  <text x="332" y="134" font-size="11" font-weight="700">CAPI (Cluster API)</text>
+  <text x="332" y="150" font-size="10" class="sub">creates REAL clusters</text>
+  <text x="332" y="164" font-size="10" class="sub">VMs (OpenStack/vSphere)</text>
+  <text x="332" y="184" font-size="10" class="sub">or bare-metal (Metal&#179;)</text>
+  <rect x="540" y="116" width="290" height="80" rx="8" class="p bi"/>
+  <text x="552" y="134" font-size="11" font-weight="700" class="info">Crossplane &#8592; worth it HERE</text>
+  <text x="552" y="150" font-size="10" class="sub">composes a HostCluster Claim</text>
+  <text x="552" y="164" font-size="10" class="sub">= CAPI bundle + network + DNS + bootstrap label</text>
+  <text x="552" y="184" font-size="10" class="sub">`provider` picks substrate per region</text>
+  <line x1="350" y1="74" x2="350" y2="88" marker-end="url(#a)"/>
+  <line x1="450" y1="206" x2="450" y2="226" marker-end="url(#a)"/>
+  <text x="458" y="220" font-size="10" class="sub">CAPI provisions + mgmt-Argo seeds the local ArgoCD</text>
+
+  <rect x="60" y="228" width="780" height="232" rx="10" class="b bg"/>
+  <text x="74" y="246" font-size="11.5" font-weight="700" class="grn">HOST CLUSTER (per env / region) &#8212; &#215;N</text>
+  <rect x="78" y="256" width="232" height="56" rx="8" class="p ba"/>
+  <text x="90" y="274" font-size="11" font-weight="700" class="amb">ArgoCD (host-local)</text>
+  <text x="90" y="290" font-size="10" class="sub">installs addons + tenants</text>
+  <text x="90" y="304" font-size="10" class="sub">(self-managing)</text>
+  <rect x="320" y="256" width="510" height="56" rx="8" class="p"/>
+  <text x="332" y="276" font-size="11" font-weight="700">platform/addons</text>
+  <text x="332" y="296" font-size="10" class="sub">cert-manager &#183; cilium &#183; ESO &#183; gateway &#183; HAMi &#183; prometheus</text>
+  <rect x="120" y="324" width="330" height="124" rx="8" class="b bg"/>
+  <text x="134" y="343" font-size="11" font-weight="700" class="grn">vCluster = tenant-a</text>
+  <text x="134" y="361" font-size="10" class="sub">Helm: charts/tenant</text>
+  <text x="134" y="377" font-size="10" class="sub">ns &#183; quota &#183; netpol &#183; secret</text>
+  <text x="134" y="393" font-size="10" class="sub">PostgreSQL &#183; api &#183; web</text>
+  <text x="134" y="409" font-size="10" class="sub">Gateway + TLS</text>
+  <text x="134" y="433" font-size="9.5" class="grn">&#8592; the tenant WORKLOAD is Helm</text>
+  <rect x="465" y="324" width="330" height="124" rx="8" class="b bg"/>
+  <text x="479" y="343" font-size="11" font-weight="700" class="grn">vCluster = tenant-b</text>
+  <text x="479" y="361" font-size="10" class="sub">Helm: charts/tenant</text>
+  <text x="479" y="393" font-size="10" class="sub">(same pattern, isolated)</text>
+  <text x="479" y="433" font-size="9.5" class="sub">+ Crossplane IF the tenant needs cloud infra</text>
+
+  <line x1="22" y1="492" x2="878" y2="492" stroke-dasharray="4 3"/>
+
+  <text x="22" y="524" font-size="16" font-weight="700">&#9313; HOMELAB — what you have today (collapsed into 1 cluster)</text>
+  <rect x="370" y="540" width="160" height="32" rx="7" class="p"/>
+  <text x="450" y="560" text-anchor="middle" font-size="11.5" font-weight="700">Git (vcluster-idp)</text>
+  <line x1="450" y1="572" x2="450" y2="588" marker-end="url(#a)"/>
+
+  <rect x="60" y="588" width="780" height="300" rx="10" class="b"/>
+  <text x="74" y="606" font-size="11.5" font-weight="700">ONE cluster = Management + Host COLLAPSED (super6c + rk1 + pi + t7910)</text>
+  <rect x="78" y="616" width="232" height="56" rx="8" class="p ba"/>
+  <text x="90" y="634" font-size="11" font-weight="700" class="amb">ArgoCD (single)</text>
+  <text x="90" y="650" font-size="10" class="sub">app-of-apps (platform-root)</text>
+  <text x="90" y="664" font-size="10" class="sub">&#8594; addons + ApplicationSets</text>
+  <rect x="320" y="616" width="510" height="56" rx="8" class="p"/>
+  <text x="332" y="636" font-size="11" font-weight="700">addons (same)</text>
+  <text x="332" y="656" font-size="10" class="sub">cilium &#183; cert-manager &#183; ESO &#183; gateway &#183; HAMi &#183; prometheus</text>
+  <rect x="78" y="684" width="240" height="74" rx="8" class="b bg"/>
+  <text x="90" y="702" font-size="10.5" font-weight="700" class="grn">vCluster tenant-a</text>
+  <text x="90" y="719" font-size="10" class="sub">Helm: charts/tenant</text>
+  <text x="90" y="735" font-size="10" class="sub">pg + api + web</text>
+  <rect x="330" y="684" width="240" height="74" rx="8" class="b bg"/>
+  <text x="342" y="702" font-size="10.5" font-weight="700" class="grn">vCluster tenant-b</text>
+  <text x="342" y="719" font-size="10" class="sub">Helm: charts/tenant</text>
+  <rect x="582" y="684" width="240" height="74" rx="8" class="b bg"/>
+  <text x="594" y="702" font-size="10.5" font-weight="700" class="grn">vCluster tenant-c (ESO)</text>
+  <text x="594" y="719" font-size="10" class="sub">Helm: charts/tenant</text>
+  <rect x="78" y="770" width="744" height="40" rx="8" class="p bi"/>
+  <text x="90" y="788" font-size="10.5" font-weight="700" class="info">GPU node srv-t7910 + HAMi (Phase 5)</text>
+  <text x="90" y="802" font-size="10" class="sub">Ollama on the P4 (HAMi slice) &#183; GPU+token billing per tenant &#183; tenant pods pinned here</text>
+  <rect x="78" y="820" width="744" height="66" rx="8" fill="none" stroke-dasharray="3 2.5" class="bi"/>
+  <text x="90" y="838" font-size="10.5" font-weight="700" class="info">Fleet path = RUNNABLE (opt-in): this cluster IS the management — no pivot</text>
+  <text x="90" y="853" font-size="10" class="sub">clusterctl init adds CAPI CRDs+controllers in place &#183; KubeVirt + CAPK &#8594; VMs on srv-t7910 &#183; Crossplane v2 HostCluster XR (namespaced, no claim)</text>
+  <text x="90" y="868" font-size="10" class="sub">install: Ansible (fleet-kubevirt.yml) OR GitOps addon (CAPI Operator) &#183; control plane = 3-node embedded etcd HA (super6c-01/02/04, quorum 2/3) + HAProxy VIP</text>
+
+  <text x="22" y="912" font-size="12" font-weight="700">Where each piece goes:</text>
+  <text x="34" y="932" font-size="11"><tspan class="grn" font-weight="700">Helm</tspan><tspan class="sub"> = the tenant workload (charts/tenant) inside each vCluster. In both architectures.</tspan></text>
+  <text x="34" y="950" font-size="11"><tspan class="info" font-weight="700">Crossplane v2</tspan><tspan class="sub"> = in the MANAGEMENT cluster, on top of CAPI (namespaced HostCluster XR, no claim, composes the CAPI Cluster directly).</tspan></text>
+  <text x="34" y="968" font-size="11"><tspan class="amb" font-weight="700">ArgoCD</tspan><tspan class="sub"> = ideal: TWO (mgmt delivers Claims+seed; host installs addons+tenants). Homelab: ONE (does it all).</tspan></text>
+  <text x="34" y="986" font-size="11"><tspan font-weight="700">CAPI</tspan><tspan class="sub"> = creates the real host clusters (ideal). Not running in the homelab — one cluster plays both roles.</tspan></text>
+  <text x="34" y="1004" font-size="11"><tspan class="grn" font-weight="700">vCluster = tenant</tspan><tspan class="sub"> ; </tspan><tspan font-weight="700">Host cluster</tspan><tspan class="sub"> = where vClusters live ; </tspan><tspan font-weight="700">Management</tspan><tspan class="sub"> = where CAPI creates host clusters.</tspan></text>
+</svg>
