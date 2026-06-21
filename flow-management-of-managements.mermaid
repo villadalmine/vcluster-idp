@@ -52,11 +52,20 @@ flowchart TB
     cCP --> cArgo --> cVC
   end
 
-  classDef git fill:#222,color:#fff,stroke:#888
-  classDef argo fill:#1d4ed8,color:#fff
-  classDef capi fill:#0891b2,color:#fff
-  classDef kv fill:#b45309,color:#fff
-  classDef svc fill:#6d28d9,color:#fff
-  classDef vc fill:#059669,color:#fff
-  classDef node fill:#0d9488,color:#fff
-  classDef sec fill:#be123c,color:#fff
+  %% Light pastel palette (matches models-decision-matrix.svg): light fills + dark text.
+  classDef git fill:#f4f4f4,stroke:#999999,color:#222222;
+  classDef argo fill:#fde7c8,stroke:#e08e0b,color:#5a3a00;
+  classDef capi fill:#dbeafe,stroke:#2563eb,color:#13315c;
+  classDef kv fill:#fed7aa,stroke:#c2410c,color:#7c2d12;
+  classDef svc fill:#f3e8ff,stroke:#9333ea,color:#581c87;
+  classDef vc fill:#cffafe,stroke:#0891b2,color:#083344;
+  classDef node fill:#dcfce7,stroke:#16a34a,color:#14532d;
+  classDef sec fill:#ffe4e6,stroke:#e11d48,color:#881337;
+
+  %% Subgraph tint by role (management = purple, regional/workload = green), matching the matrix diagram.
+  classDef rootBox fill:#fafafa,stroke:#475569,color:#0f172a;
+  classDef mgmtBox fill:#faf5ff,stroke:#7c3aed,color:#3b0764;
+  classDef regBox fill:#f0fdf4,stroke:#16a34a,color:#14532d;
+  class ROOT rootBox
+  class MGMT mgmtBox
+  class EUW1,CHILD regBox
