@@ -626,3 +626,36 @@ Our platform is architected to scale out using a multi-cluster fleet design rath
 *   **Scoped Kubeconfig**: Tenants run `vcluster connect` to download a kubeconfig that isolates them. In the status tool [`cli/platform`](./cli/platform#L150-L152), we query the virtual control plane directly without exposing the host context.
 *   **Logs & Metrics**: Scoped `kubectl logs` are fully supported within the vCluster plane. Centralized monitoring is designed using the LGTM stack (Loki/Grafana/Mimir), enforcing OIDC multi-tenancy based on tenant ID headers.
 
+## 6. Glossary — acronyms used in this repo
+
+| Acronym | Stands for | One-liner |
+|---|---|---|
+| **IDP** | Internal Developer Platform | The whole thing: on-demand isolated tenant environments via GitOps. |
+| **GitOps** | — | Git is the source of truth; a controller (ArgoCD) reconciles the cluster to match, and prunes what's removed. |
+| **CAPI** | **C**luster **API** | Kubernetes-native API to declaratively create / upgrade / delete *whole clusters*. |
+| **CAPK** | **C**luster **API** Provider **K**ubeVirt | CAPI infrastructure provider that makes the cluster's nodes **KubeVirt VMs**. |
+| **CAAPH** | **C**luster **A**PI **A**dd-on **P**rovider for **H**elm | CAPI add-on provider; installs a Helm chart (e.g. ArgoCD) *into* a workload cluster via a `HelmChartProxy`. |
+| **CRS** | **C**luster **R**esource **S**et | CAPI mechanism to seed raw manifests (CNI, `region-root`) into freshly-created clusters. |
+| **CRD** | **C**ustom **R**esource **D**efinition | Extends the Kubernetes API with a new object kind. |
+| **XR / XRD** | Composite **R**esource / its **D**efinition | Crossplane: an instance of our custom `HostCluster` platform API, and its schema. |
+| **KCP** | **K**ubeadm**C**ontrol**P**lane | CAPI control-plane object (etcd + apiserver replicas) provisioned via kubeadm. |
+| **MD** | **M**achine**D**eployment | CAPI object managing a set of worker Machines (like a Deployment, for nodes). |
+| **VM / VMI** | **V**irtual **M**achine / VM **I**nstance | KubeVirt objects; the VMI is the running VM — a guest-cluster node. |
+| **CDI / DV** | **C**ontainerized **D**ata **I**mporter / **D**ata**V**olume | CDI imports a cloud image into a PVC; the DataVolume is the VM boot disk (on Longhorn / HCI). |
+| **CNI** | **C**ontainer **N**etwork **I**nterface | Pod networking plugin (Calico / Cilium). |
+| **VXLAN / IPIP** | Virtual eXtensible LAN / IP-in-IP | Calico overlay encapsulations; VXLAN (UDP 4789) crosses the nested-KubeVirt masquerade, IPIP doesn't. |
+| **vCluster** | virtual cluster | A per-tenant virtual control plane (own apiserver + etcd) on shared nodes. |
+| **ESO** | **E**xternal **S**ecrets **O**perator | Reads a secret backend and creates k8s Secrets from `ExternalSecret` references. |
+| **SOPS** | **S**ecrets **OP**eration**S** | Encrypt secrets *in* Git (no external backend). |
+| **HCI** | **H**yper-**C**onverged **I**nfrastructure | Compute + replicated storage on the same nodes (Longhorn here). |
+| **HAMi** | **H**eterogeneous **AI** computing virtualization **mi**ddleware | vGPU slicing (VRAM / cores per tenant) without MIG hardware. |
+| **SPOF** | **S**ingle **P**oint **O**f **F**ailure | What the decentralized per-cluster ArgoCD design avoids. |
+| **HA** | **H**igh **A**vailability | e.g. 3 control-plane replicas → etcd quorum 2/3. |
+| **k3s** | lightweight Kubernetes (Rancher) | The Root cluster's distribution. |
+| **LB-IPAM / VIP** | LoadBalancer IP Address Mgmt / Virtual IP | Cilium assigns LB services an external IP, announced over **L2** (ARP). |
+| **SNI** | **S**erver **N**ame **I**ndication | TLS hostname in the handshake; the Gateway routes/serves by it. |
+| **RBAC** | **R**ole-**B**ased **A**ccess **C**ontrol | Kubernetes authorization (roles + bindings). |
+| **SSA** | **S**erver-**S**ide **A**pply | Field-managed apply; re-applying identical specs is a no-op. |
+| **LGTM** | **L**oki **G**rafana **T**empo **M**imir | The (designed) centralized observability stack. |
+| **DQ** | **D**esign **Q**uestion | The take-home design questions answered in §5. |
+
