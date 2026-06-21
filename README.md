@@ -533,10 +533,6 @@ clusters the **control-plane hosts no tenants**: vClusters run only on the **wor
 > *(Honest correction: an earlier draft blamed "masquerade dropping IPIP packets". The actual multi-node
 > blocker is the masquerade IP collision above; the working clusters never used masquerade.)*
 
-> 📊 **Flow diagram:** [`flow-management-of-managements.svg`](./flow-management-of-managements.svg)
-> (source: `.mermaid`) — the full graph of what consumes/connects to what: Git → ArgoCD → CAPI/KubeVirt →
-> host clusters → CAAPH/CRS addons → vClusters, plus `host-mgmt` creating `mgmt-child` via external-infra.
-
 ### 3.2 Resilience & Node-Failure (honest limitation + production answer)
 
 During this work the single physical KVM host (`srv-t7910`) crashed, which took **every** nested host
