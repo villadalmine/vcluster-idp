@@ -7,6 +7,11 @@ kind: Cluster
 metadata:
   name: mgmt-child
   namespace: default
+  labels:
+    # host-mgmt trata a mgmt-child como un REGIONAL: su CAAPH le instala ArgoCD (selector role=regional)
+    # y su CRS le siembra el region-root (selector region=mc-euw1). Espeja el modelo del Root un nivel abajo.
+    platform.idp/role: regional
+    platform.idp/region: mc-euw1
 spec:
   clusterNetwork:
     pods:

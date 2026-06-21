@@ -41,3 +41,8 @@ spec:
     infrastructure:
       kubevirt:
         version: v0.10.5     # CAPK v1beta1-contract (igual que el Root)
+    addon:
+      helm:
+        version: v0.4.2      # CAAPH (HelmChartProxy) — host-mgmt instala ArgoCD EN su hijo (mgmt-child),
+                             # igual que el Root lo instala en sus regionales. Recursión: el hijo termina
+                             # con su PROPIO ArgoCD descentralizado (sin SPOF). v0.4.2 = último v1beta1-contract.

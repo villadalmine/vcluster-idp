@@ -1,0 +1,86 @@
+# Fase 3 (recursión completa) — estos 3 objetos se SIEMBRAN DENTRO de host-mgmt (vía el CRS del Root
+# mgmt-child-addons) y hacen que host-mgmt entregue ArgoCD + un region-root a su hijo (mgmt-child),
+# EXACTAMENTE como el Root se los entrega a sus regionales, un escalón más abajo. Resultado: mgmt-child
+# queda con su PROPIO ArgoCD descentralizado que despliega su propio vCluster (sin SPOF). namespace=default
+# porque el Cluster mgmt-child vive en default dentro de host-mgmt (HelmChartProxy/CRS seleccionan en su ns).
+#
+# 1) CAAPH: host-mgmt instala ArgoCD DENTRO de mgmt-child (selector role=regional, igual que el Root).
+apiVersion: addons.cluster.x-k8s.io/v1alpha1
+kind: HelmChartProxy
+metadata:
+  name: argocd
+  namespace: default
+spec:
+  clusterSelector:
+    matchLabels:
+      platform.idp/role: regional
+  repoURL: https://argoproj.github.io/argo-helm
+  chartName: argo-cd
+  releaseName: argocd
+  namespace: argocd
+  options:
+    install:
+      createNamespace: true
+  valuesTemplate: |
+    crds:
+      install: true
+    configs:
+      params:
+        server.insecure: true
+---
+# 2) ConfigMap que empaqueta el region-root del hijo (lo desempaca el CRS de abajo en el ArgoCD de mgmt-child).
+#    El region-root apunta a la MISMA base compartida clusters/regions/_base y la parametriza a region=mc-euw1
+#    (espejo de region-root-eu-west1.yaml del Root). Así el hijo provisiona su propio vCluster por tenant.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: region-root-mc-euw1
+  namespace: default
+data:
+  region-root.yaml: |
+    apiVersion: argoproj.io/v1alpha1
+    kind: Application
+    metadata:
+      name: region-root
+      namespace: argocd
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/villadalmine/vcluster-idp.git
+        targetRevision: HEAD
+        path: clusters/regions/_base
+        kustomize:
+          patches:
+            - target: { group: argoproj.io, kind: ApplicationSet, name: vclusters-REGION }
+              patch: |-
+                - { op: replace, path: /metadata/name, value: vclusters-mc-euw1 }
+                - { op: replace, path: /spec/generators/0/git/files/0/path, value: "clusters/regions/mc-euw1/tenants/**/*.yaml" }
+                - { op: replace, path: /spec/template/metadata/labels/platform.idp~1region, value: mc-euw1 }
+            - target: { group: argoproj.io, kind: ApplicationSet, name: workloads-REGION }
+              patch: |-
+                - { op: replace, path: /metadata/name, value: workloads-mc-euw1 }
+                - { op: replace, path: /spec/generators/0/git/files/0/path, value: "clusters/regions/mc-euw1/tenants/**/*.yaml" }
+                - { op: replace, path: /spec/template/metadata/labels/platform.idp~1region, value: mc-euw1 }
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: argocd
+      syncPolicy:
+        automated: { prune: true, selfHeal: true }
+        syncOptions:
+          - CreateNamespace=true
+---
+# 3) CRS DENTRO de host-mgmt: siembra el region-root (ConfigMap de arriba) en el ArgoCD de mgmt-child.
+#    ApplyOnce, reintenta hasta que exista el CRD Application (lo instala el CAAPH de arriba). selector region=mc-euw1.
+apiVersion: addons.cluster.x-k8s.io/v1beta1
+kind: ClusterResourceSet
+metadata:
+  name: region-root-mc-euw1
+  namespace: default
+spec:
+  clusterSelector:
+    matchLabels:
+      platform.idp/region: mc-euw1
+  strategy: ApplyOnce
+  resources:
+    - name: region-root-mc-euw1
+      kind: ConfigMap

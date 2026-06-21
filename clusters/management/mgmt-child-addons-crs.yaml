@@ -1,0 +1,17 @@
+# Siembra el bundle de addons (mgmt-child-addons.yaml) DENTRO de host-mgmt (role=management) — la pieza
+# que vuelve "recursivo" el modelo: host-mgmt no sólo crea mgmt-child, también le entrega su propio ArgoCD
+# (CAAPH) y su region-root (CRS), igual que el Root con sus regionales. ApplyOnce, reintenta hasta que los
+# CRDs (HelmChartProxy, ClusterResourceSet) existan en host-mgmt (los instala el CAPI operator + el addon helm).
+apiVersion: addons.cluster.x-k8s.io/v1beta1
+kind: ClusterResourceSet
+metadata:
+  name: mgmt-child-addons
+  namespace: fleet
+spec:
+  clusterSelector:
+    matchLabels:
+      platform.idp/role: management
+  strategy: ApplyOnce
+  resources:
+    - name: mgmt-child-addons
+      kind: ConfigMap
