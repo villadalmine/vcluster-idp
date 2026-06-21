@@ -9,7 +9,6 @@ metadata:
   namespace: fleet
   labels:
     env: dev
-    region: eu-central1
 spec:
   crossplane:
     compositionRef:
@@ -24,5 +23,4 @@ spec:
   nodeImage: quay.io/capk/ubuntu-2404-container-disk:v1.31.5
   cni: calico-vxlan
   role: management
-  region: eu-central1
   cpInitTimeout: "15m0s"

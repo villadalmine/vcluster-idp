@@ -23,6 +23,6 @@ spec:
   nodeArch: amd64
   nodeImage: quay.io/capk/ubuntu-2404-container-disk:v1.31.5
   cni: calico-vxlan
-  role: management
+  role: regional
   region: us-central1
   cpInitTimeout: "15m0s"

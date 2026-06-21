@@ -10,8 +10,11 @@ metadata:
   namespace: fleet
 spec:
   clusterSelector:
-    matchLabels:
-      platform.idp/role: management
+    # ArgoCD se instala en los management (corren CAPI + se autogestionan) Y en los regional (workload
+    # clusters que hospedan sus propios tenants con GitOps descentralizado). NUNCA pone tenants en un
+    # management: un management CREA el workload que hospeda los vClusters (ver MODELO-CANONICO.md).
+    matchExpressions:
+      - { key: platform.idp/role, operator: In, values: [management, regional] }
   repoURL: https://argoproj.github.io/argo-helm
   chartName: argo-cd
   # version: 7.8.2          # pinear para reproducibilidad; sin pin, CAAPH instala el último

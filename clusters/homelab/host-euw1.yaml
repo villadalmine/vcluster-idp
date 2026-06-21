@@ -24,7 +24,7 @@ spec:
   nodeArch: amd64
   nodeImage: quay.io/capk/ubuntu-2404-container-disk:v1.31.5
   cni: calico-vxlan
-  role: management
+  role: regional
   region: eu-west1
   # Boot lento: la VM de euw1 arranca de un DataVolume (Longhorn) sobre KubeVirt anidado y su
   # control-plane tarda >4m en levantar. Sin esto, kubeadm hace timeout a los 4m en wait-control-plane
