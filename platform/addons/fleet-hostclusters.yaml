@@ -23,3 +23,15 @@ spec:
     syncOptions:
       - CreateNamespace=true
       - SkipDryRunOnMissingResource=true   # the HostCluster CRD appears via fleet-config
+  # OutOfSync benigno: el webhook de defaulting de CAPI muta el MachineHealthCheck DESPUÉS del apply.
+  # No están en Git (client-side apply, manager argocd-controller) -> diff cosmético permanente aunque
+  # el MHC esté sano (currentHealthy 1/1, RemediationAllowed). Ignoramos sólo lo que injecta/normaliza CAPI:
+  #   - maxUnhealthy: el webhook lo defaultea a "100%" (en Git no lo fijamos a propósito, ver el manifest).
+  #   - nodeStartupTimeout / unhealthyConditions: CAPI normaliza las duraciones (25m->25m0s, 900s->15m0s).
+  ignoreDifferences:
+    - group: cluster.x-k8s.io
+      kind: MachineHealthCheck
+      jsonPointers:
+        - /spec/maxUnhealthy
+        - /spec/nodeStartupTimeout
+        - /spec/unhealthyConditions

@@ -23,3 +23,14 @@ spec:
       - CreateNamespace=true
       - ServerSideApply=true          # los CRDs de CDI son grandes
       - SkipDryRunOnMissingResource=true
+      - RespectIgnoreDifferences=true # selfHeal no pelea con el schema que reescribe cdi-operator
+  # OutOfSync benigno: el cdi-operator es co-dueño del CRD cdis.cdi.kubevirt.io. ArgoCD aplica vía SSA y
+  # sólo posee spec.group/names/scope; el operator gestiona spec.versions y reescribe/normaliza el
+  # openAPIV3Schema (CRD ~89KB) tras el apply -> diff permanente aunque CDI funcione. En vez de listar
+  # punteros frágiles del schema, ignoramos por OWNER: todo lo que gestione el field-manager cdi-operator.
+  ignoreDifferences:
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+      name: cdis.cdi.kubevirt.io
+      managedFieldsManagers:
+        - cdi-operator

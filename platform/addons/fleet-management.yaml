@@ -23,3 +23,13 @@ spec:
     syncOptions:
       - ServerSideApply=true
       - SkipDryRunOnMissingResource=true   # el CRD HelmChartProxy aparece cuando CAAPH instala
+      - RespectIgnoreDifferences=true      # selfHeal no revierte los campos ignorados (co-dueño CAAPH)
+  # OutOfSync benigno: CAAPH (el addon-provider) es co-dueño de spec.options del HelmChartProxy. Tras el
+  # apply rellena sus defaults (enableClientCache:false, upgrade.maxHistory:10, reconcileStrategy) y
+  # normaliza el timeout (15m->15m0s). En Git sólo fijamos install.createNamespace/timeout/wait, así que
+  # esos defaults aparecen como diff aunque ambos HelmChartProxy estén Ready=True. Ignoramos spec.options.
+  ignoreDifferences:
+    - group: addons.cluster.x-k8s.io
+      kind: HelmChartProxy
+      jsonPointers:
+        - /spec/options
