@@ -99,7 +99,7 @@ applications:
   web:
     version: "$web"
 YAML
-  ok "tenants/$ENVIRONMENT/$TENANT.yaml written"
+  ok "${TENANT_FILE#$REPO_ROOT/} written${REGION:+ (regional: host $REGION)}"
 
   if git -C "$REPO_ROOT" rev-parse >/dev/null 2>&1; then
     git -C "$REPO_ROOT" add "$TENANT_FILE"
@@ -125,7 +125,7 @@ cmd_delete() {
   info "Tenant '$TENANT' (env=$ENVIRONMENT) → deleting"
   if [[ -f "$TENANT_FILE" ]]; then
     rm -f "$TENANT_FILE"
-    ok "tenants/$ENVIRONMENT/$TENANT.yaml removed"
+    ok "${TENANT_FILE#$REPO_ROOT/} removed${REGION:+ (regional: host $REGION)}"
     if git -C "$REPO_ROOT" rev-parse >/dev/null 2>&1; then
       git -C "$REPO_ROOT" add -A "$(dirname "$TENANT_FILE")"
       git -C "$REPO_ROOT" commit -m "feat(tenant): deprovision $TENANT in $ENVIRONMENT" >/dev/null 2>&1 || true
@@ -134,8 +134,11 @@ cmd_delete() {
   else
     warn "$TENANT_FILE does not exist (idempotent: nothing to delete)"
   fi
-  # Backup direct cleanup (in case Argo is not present): delete the vCluster namespace.
-  if command -v kubectl >/dev/null 2>&1; then
+  # Backup direct cleanup (CENTRALIZADO): el vCluster vive en el contexto actual (Root) → borrar el ns
+  # cascadea PVC/leftovers. REGIONAL: el ns vive en el host <region> (otro kubeconfig), NO en el contexto
+  # actual → NO lo tocamos acá; el prune de GitOps baja el workload y el GC del CronJob vcluster-register
+  # limpia el cluster-secret de registro + ns/PVC huérfanos en el host.
+  if [[ -z "$REGION" ]] && command -v kubectl >/dev/null 2>&1; then
     kubectl delete ns "$VC_NS" --ignore-not-found --wait=false 2>/dev/null || true
   fi
 }
