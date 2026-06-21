@@ -658,7 +658,21 @@ Our platform is architected to scale out using a multi-cluster fleet design rath
 *   **Scoped Kubeconfig**: Tenants run `vcluster connect` to download a kubeconfig that isolates them. In the status tool [`cli/platform`](./cli/platform#L150-L152), we query the virtual control plane directly without exposing the host context.
 *   **Logs & Metrics**: Scoped `kubectl logs` are fully supported within the vCluster plane. Centralized monitoring is designed using the LGTM stack (Loki/Grafana/Mimir), enforcing OIDC multi-tenancy based on tenant ID headers.
 
-## 6. Glossary — acronyms used in this repo
+## 6. Trade-offs (what was simplified — on purpose)
+*   **Single KVM node = SPOF.** All guest VMs are pinned to one x86/KVM host (`srv-t7910`); even the "HA" control plane stacks its 3 VMs on that one box, so it is HA against a VM/process failure but **not** against the node dying (full detail + recovery lesson in §3.2).
+*   **vCluster shared-nodes = soft isolation.** Tenants get an isolated control plane but **share worker nodes** (chosen for density). The stronger rungs (dedicated/private nodes → fully separate clusters) are designed (§3.1 model 7) but not all run live.
+*   **Secrets default to Helm-generated, in-chart.** Simple and Git-driven, but **no rotation / dynamic secrets**; a real backend (ESO) is opt-in, not the default.
+*   **CNI chosen empirically.** We converged on **calico-vxlan** for nested KubeVirt and did **not** exhaustively tune the Cilium guest-overlay path (MTU / `kubeProxyReplacement`) once VXLAN worked.
+*   **Explicitly out of scope** (per the brief): CI/CD pipelines, service mesh, production-grade HA, backups, a monitoring stack, custom operators, full Terraform, and enterprise IAM.
+
+## 7. Future Improvements (with more time)
+*   **Real node-failure resilience:** multiple hypervisor nodes + `evictionStrategy: LiveMigrate` + replicated storage to drain a failing node; control plane spread **across** physical nodes; `MachineHealthCheck` with a tuned `maxUnhealthy` (~40%).
+*   **Secrets-as-a-service:** a real backend (Vault / OpenBao) via ESO with **per-tenant policy/path** and Workload-Identity bootstrap (no static creds) — see `secrets-flow.svg` in §Q6.
+*   **Centralized observability:** the **LGTM** stack (Loki/Grafana/Tempo/Mimir) with OIDC multi-tenancy keyed by tenant ID.
+*   **Progressive delivery:** Argo Rollouts (canary / blue-green) wired to the Gateway API routes.
+*   **etcd backup/restore** for guest clusters (today there is none — re-provisioning is the recovery path, §3.2) and **pinned chart/image versions** everywhere for full reproducibility.
+
+## 8. Glossary — acronyms used in this repo
 
 | Acronym | Stands for | One-liner |
 |---|---|---|
