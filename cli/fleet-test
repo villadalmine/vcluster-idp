@@ -8,6 +8,7 @@
 #
 #   cli/fleet-test check [cluster|all]      # validate every layer (nodes/CNI/DNS/ArgoCD/vCluster)
 #   cli/fleet-test vclusters                # list ALL vClusters across every host cluster
+#   cli/fleet-test vms                      # list every KubeVirt VM and the real hypervisor node it runs on
 #   cli/fleet-test kc <cluster> <args...>   # kubectl passthrough to a host cluster
 #   cli/fleet-test vc <cluster> <vc> <args> # kubectl INSIDE a vCluster
 #   cli/fleet-test dns <cluster>            # cross-node DNS test (the MTU validation)
@@ -181,6 +182,12 @@ list_vclusters() {
   done
 }
 
+list_vms() {  # every KubeVirt guest node (VM) across the fleet and the REAL hypervisor node it runs on
+  hdr "KubeVirt VMs → real hypervisor node"
+  kubectl get vmi -A -o custom-columns='NAMESPACE:.metadata.namespace,VM (guest node):.metadata.name,PHASE:.status.phase,REAL NODE:.status.nodeName' 2>/dev/null \
+    || warn "no VirtualMachineInstances found (is KubeVirt running?)"
+}
+
 clean() { kubectl -n $NS delete pod -l app=fleet-test-jump --ignore-not-found 2>&1; echo "jump pods deleted (the fleet-dnstest pods are recreated clean on the next dns test)."; }
 
 cmd=${1:-demo}; shift || true
@@ -189,10 +196,11 @@ ALL="$(discover_clusters)"
 case "$cmd" in
   check)   t=${1:-all}; if [ "$t" = all ]; then fleet_banner; for c in $ALL; do check "$c"; done; else check "$t"; fi ;;
   vclusters) fleet_banner; list_vclusters ;;
+  vms)     list_vms ;;
   dns)     ensure_jump "$1" && { echo -n "cross-node DNS $1: "; dns_test "$1"; } ;;
   kc)      c=$1; shift; ensure_jump "$c" && kc "$c" "$@" ;;
   vc)      c=$1; v=$2; shift 2; ensure_jump "$c" && kc "$c" -n "$v" exec "deploy/$v" -- /bin/sh -c "kubectl $*" 2>&1 || warn "to enter the vCluster use: vcluster connect <v> -n <v> (from the host)" ;;
   demo)    fleet_banner; for c in $ALL; do check "$c"; done; list_vclusters ;;
   clean)   clean ;;
-  *) echo "usage: cli/fleet-test {check [cluster|all]|vclusters|dns <c>|kc <c> <args>|demo|clean}"; exit 1 ;;
+  *) echo "usage: cli/fleet-test {check [cluster|all]|vclusters|vms|dns <c>|kc <c> <args>|demo|clean}"; exit 1 ;;
 esac
