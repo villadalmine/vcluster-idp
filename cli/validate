@@ -2,21 +2,42 @@
 # ═══════════════════════════════════════════════════════════════════════════
 # validate — run the VALIDACION.md catalog and report PASS/FAIL per requirement.
 #
-# Usage:   ./cli/validate [tenant] [env]
-#   e.g.   ./cli/validate tenant-a dev
+# Usage:   ./cli/validate [tenant] [env] [--debug] [--drift]
+#   e.g.   ./cli/validate tenant-a dev --debug
 # Env:     PEER_TENANT (default tenant-b, for the isolation test), PLATFORM_DOMAIN,
-#          ARGOCD_NS (default argocd). Flag: --drift runs the destructive drift test.
+#          ARGOCD_NS (default argocd).
 #
 # Requires: kubectl, helm, vcluster CLI, curl. Run from the repo root.
 # ═══════════════════════════════════════════════════════════════════════════
 set -uo pipefail
 
-TENANT="${1:-tenant-a}"
-ENV="${2:-${PLATFORM_ENV:-dev}}"
+TENANT="tenant-a"
+ENV="dev"
+DOMAIN="example.local"
+PEER="tenant-b"
+ARGOCD_NS="argocd"
+DRIFT=false
+DEBUG=false
+
+# Parse args
+for arg in "$@"; do
+  case "$arg" in
+    --drift) DRIFT=true;;
+    --debug) DEBUG=true;;
+    *)
+      # Assign positional args (tenant, env) in order
+      if [ "$arg" != "${1:-}" ] && [ "$arg" = "${2:-}" ]; then
+        ENV="$arg"
+      elif [ "$arg" = "${1:-}" ]; then
+        TENANT="$arg"
+      fi
+      ;;
+  esac
+done
+
 DOMAIN="${PLATFORM_DOMAIN:-example.local}"
 PEER="${PEER_TENANT:-tenant-b}"
 ARGOCD_NS="${ARGOCD_NS:-argocd}"
-DRIFT=false; [[ " $* " == *" --drift "* ]] && DRIFT=true
 
 NS="vcluster-${TENANT}-${ENV}"      # vCluster namespace on the host
 VNS="${TENANT}"                     # namespace inside the vCluster
@@ -29,116 +50,159 @@ skip(){ SKIP=$((SKIP+1)); echo "  $(y SKIP) $1${2:+  — $2}"; }
 sec(){ echo; echo "── $1"; }
 vc(){ vcluster connect "$NS" -n "$NS" -- "$@" 2>/dev/null; }
 
-echo "validate: tenant=$TENANT env=$ENV (ns=$NS)  peer=$PEER"
+# Connectivity Check (Preflight)
+if ! kubectl cluster-info >/dev/null 2>&1; then
+  echo -e "$(r "✗ Error:") No Kubernetes cluster connectivity detected."
+  echo "This tool performs real E2E validation checks against a running cluster."
+  echo "Please configure your KUBECONFIG context or run 'make bootstrap' to start."
+  exit 1
+fi
+
+# Assert vcluster CLI is available
+if ! command -v vcluster >/dev/null 2>&1; then
+  echo -e "$(r "✗ Error:") 'vcluster' CLI is required to validate virtual cluster resources."
+  exit 1
+fi
+
+# Assert helm CLI is available
+if ! command -v helm >/dev/null 2>&1; then
+  echo -e "$(r "✗ Error:") 'helm' CLI is required to validate chart rendering."
+  exit 1
+fi
+
+echo "validate: tenant=$TENANT env=$ENV (ns=$NS)  peer=$PEER  debug=$DEBUG"
+
+# Helper function to run commands with optional stdout/stderr print
+x() {
+  local cmd="$1"
+  local msg="$2"
+  if $DEBUG; then
+    echo "  $(y "DEBUG:") Running: $cmd"
+    if eval "$cmd"; then
+      ok "$msg"
+      return 0
+    else
+      no "$msg"
+      return 1
+    fi
+  else
+    if eval "$cmd" >/dev/null 2>&1; then
+      ok "$msg"
+      return 0
+    else
+      no "$msg"
+      return 1
+    fi
+  fi
+}
 
 # ── Fase 0 — estático ───────────────────────────────────────────────────────
 sec "Static (Fase 0)"
-helm lint charts/tenant >/dev/null 2>&1 && ok "helm lint charts/tenant" || no "helm lint charts/tenant"
-helm template t charts/tenant --set tenant.name="$TENANT" --set tenant.environment="$ENV" 2>/dev/null \
-  | grep -q 'argocd.argoproj.io/sync-wave' && ok "sync-wave annotations render (req 10)" || no "sync-wave annotations render"
+x "helm lint charts/tenant" "helm lint charts/tenant"
+x "helm template t charts/tenant --set tenant.name='$TENANT' --set tenant.environment='$ENV' 2>/dev/null | grep -q 'argocd.argoproj.io/sync-wave'" "sync-wave annotations render (req 10)"
 
 # ── Platform / GitOps ───────────────────────────────────────────────────────
 sec "Platform / GitOps"
 for as in tenant-vclusters tenant-workloads tenant-routes; do
-  kubectl -n "$ARGOCD_NS" get applicationset "$as" >/dev/null 2>&1 && ok "ApplicationSet $as" || no "ApplicationSet $as"
+  x "kubectl -n '$ARGOCD_NS' get applicationset '$as'" "ApplicationSet $as"
 done
+
 for app in "vcluster-$TENANT-$ENV" "wl-$TENANT-$ENV" "route-$TENANT-$ENV"; do
-  h=$(kubectl -n "$ARGOCD_NS" get application "$app" -o jsonpath='{.status.health.status}' 2>/dev/null)
-  [ "$h" = "Healthy" ] && ok "$app Healthy" || no "$app health" "${h:-not found}"
+  x "[ \"\$(kubectl -n '$ARGOCD_NS' get application '$app' -o jsonpath='{.status.health.status}' 2>/dev/null)\" = 'Healthy' ]" "$app Healthy"
 done
 
 # ── vCluster + registro (req 1, 2, Fase 2) ─────────────────────────────────
 sec "vCluster + registration"
-vcluster list 2>/dev/null | grep -qE "^\s*$NS\s.*Running" && ok "vCluster $NS Running (req 1)" || no "vCluster $NS Running"
-kubectl -n "$ARGOCD_NS" get secret -l argocd.argoproj.io/secret-type=cluster -o name 2>/dev/null \
-  | grep -q "/$NS$" && ok "vCluster registered in ArgoCD (Fase 2)" || no "vCluster registered in ArgoCD"
+x "vcluster list 2>/dev/null | grep -qE '^\s*$NS\s.*Running'" "vCluster $NS Running (req 1)"
+x "kubectl -n '$ARGOCD_NS' get secret -l argocd.argoproj.io/secret-type=cluster -o name 2>/dev/null | grep -q '/$NS$'" "vCluster registered in ArgoCD (Fase 2)"
 
 # ── Req 3 — namespace + pg + 2 apps + credenciales ──────────────────────────
 sec "Req 3 — tenant contents"
-vc kubectl get statefulset "$TENANT-postgres" -n "$VNS" >/dev/null 2>&1 && ok "PostgreSQL StatefulSet" || no "PostgreSQL StatefulSet"
-vc kubectl get deploy "$TENANT-customer-api" -n "$VNS" >/dev/null 2>&1 && ok "customer-api Deployment" || no "customer-api Deployment"
-vc kubectl get deploy "$TENANT-customer-web" -n "$VNS" >/dev/null 2>&1 && ok "customer-web Deployment" || no "customer-web Deployment"
-pw=$(vc kubectl get secret "$TENANT-postgres" -n "$VNS" -o jsonpath='{.data.password}' 2>/dev/null | tail -1)
-[ -n "$pw" ] && ok "Postgres Secret auto-generated (req 8)" || no "Postgres Secret"
+x "vcluster connect '$NS' -n '$NS' -- kubectl get statefulset '$TENANT-postgres' -n '$VNS'" "PostgreSQL StatefulSet"
+x "vcluster connect '$NS' -n '$NS' -- kubectl get deploy '$TENANT-customer-api' -n '$VNS'" "customer-api Deployment"
+x "vcluster connect '$NS' -n '$NS' -- kubectl get deploy '$TENANT-customer-web' -n '$VNS'" "customer-web Deployment"
+x "[ -n \"\$(vcluster connect '$NS' -n '$NS' -- kubectl get secret '$TENANT-postgres' -n '$VNS' -o jsonpath='{.data.password}' 2>/dev/null | tail -1)\" ]" "Postgres Secret auto-generated (req 8)"
 
 # ── Req 5 — version management ───────────────────────────────────────────────
 sec "Req 5 — version management"
 want=$(awk '/^[[:space:]]*api:/{f=1} f&&/version:/{gsub(/[" ]/,"",$2); print $2; exit}' "tenants/$ENV/$TENANT.yaml" 2>/dev/null)
-got=$(vc kubectl get deploy "$TENANT-customer-api" -n "$VNS" -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null | tail -1 | sed 's/.*://')
-if [ -n "$want" ] && [ "$want" = "$got" ]; then ok "api image tag = $got (matches tenant.yaml)"
-else no "api image tag" "want=$want got=$got"; fi
+x "got=\$(vcluster connect '$NS' -n '$NS' -- kubectl get deploy '$TENANT-customer-api' -n '$VNS' -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null | tail -1 | sed 's/.*://'); [ -n \"$want\" ] && [ \"\$want\" = \"\$got\" ]" "api image tag = \$want (matches tenant.yaml)"
 
 # ── Req 6 — resource governance ─────────────────────────────────────────────
 sec "Req 6 — resource governance"
-vc kubectl get resourcequota "$TENANT-quota" -n "$VNS" >/dev/null 2>&1 && ok "ResourceQuota" || no "ResourceQuota"
-vc kubectl get limitrange "$TENANT-limits" -n "$VNS" >/dev/null 2>&1 && ok "LimitRange" || no "LimitRange"
+x "vcluster connect '$NS' -n '$NS' -- kubectl get resourcequota '$TENANT-quota' -n '$VNS'" "ResourceQuota"
+x "vcluster connect '$NS' -n '$NS' -- kubectl get limitrange '$TENANT-limits' -n '$VNS'" "LimitRange"
 
 # ── Req 8 — secret backend (generated | eso, ADR-07) ────────────────────────
 BACKEND=$(awk '/^[[:space:]]*secretBackend:/{print $2; exit}' "tenants/$ENV/$TENANT.yaml" 2>/dev/null)
 BACKEND="${BACKEND:-generated}"
 sec "Req 8 — secret backend ($BACKEND)"
 if [ "$BACKEND" = "eso" ]; then
-  vc kubectl get deploy external-secrets -n external-secrets >/dev/null 2>&1 \
-    && ok "ESO installed inside the vCluster" || no "ESO installed inside the vCluster"
-  st=$(vc kubectl get externalsecret "$TENANT-postgres" -n "$VNS" \
-         -o jsonpath='{.status.conditions[0].status}' 2>/dev/null | tail -1)
-  [ "$st" = "True" ] && ok "ExternalSecret Ready=True (SecretSynced)" || no "ExternalSecret Ready" "${st:-not found}"
-  vc kubectl get secret "$TENANT-postgres" -n "$VNS" >/dev/null 2>&1 \
-    && ok "Secret materialized by ESO (password never in Git)" || no "Secret materialized by ESO"
+  x "vcluster connect '$NS' -n '$NS' -- kubectl get deploy external-secrets -n external-secrets" "ESO installed inside the vCluster"
+  x "[ \"\$(vcluster connect '$NS' -n '$NS' -- kubectl get externalsecret '$TENANT-postgres' -n '$VNS' -o jsonpath='{.status.conditions[0].status}' 2>/dev/null | tail -1)\" = 'True' ]" "ExternalSecret Ready=True (SecretSynced)"
+  x "vcluster connect '$NS' -n '$NS' -- kubectl get secret '$TENANT-postgres' -n '$VNS'" "Secret materialized by ESO (password never in Git)"
 else
-  pw=$(vc kubectl get secret "$TENANT-postgres" -n "$VNS" -o jsonpath='{.data.password}' 2>/dev/null | tail -1)
-  [ -n "$pw" ] && ok "generated Secret present (randAlphaNum, never hardcoded)" || no "generated Secret"
+  x "[ -n \"\$(vcluster connect '$NS' -n '$NS' -- kubectl get secret '$TENANT-postgres' -n '$VNS' -o jsonpath='{.data.password}' 2>/dev/null | tail -1)\" ]" "generated Secret present (randAlphaNum, never hardcoded)"
 fi
 
 # ── Req 7 — network isolation ───────────────────────────────────────────────
 sec "Req 7 — network isolation"
-kubectl -n "$NS" get ciliumnetworkpolicy "$TENANT-isolation" >/dev/null 2>&1 \
-  && ok "CiliumNetworkPolicy present" || no "CiliumNetworkPolicy present"
-APIP=$(kubectl -n "$NS" get svc -o jsonpath='{range .items[*]}{.metadata.name}={.spec.clusterIP}{"\n"}{end}' 2>/dev/null | grep customer-web | head -1 | cut -d= -f2)
+x "kubectl -n '$NS' get ciliumnetworkpolicy '$TENANT-isolation'" "CiliumNetworkPolicy present"
+APIP=$(kubectl -n "$NS" get svc -o jsonpath='{range .items[*]}{.metadata.name}={.spec.clusterIP}{"\n"}{end}' 2>/dev/null | grep customer-web | head -1 | cut -d= -f2 || true)
 if [ -n "$APIP" ] && kubectl get ns "vcluster-$PEER-$ENV" >/dev/null 2>&1; then
-  out=$(kubectl -n "vcluster-$PEER-$ENV" run "idp-probe-$$" --rm -i --restart=Never --image=curlimages/curl -- \
-          sh -c "curl -m 5 -s -o /dev/null -w 'CODE=%{http_code}' http://$APIP/" 2>/dev/null)
-  code=$(printf '%s' "$out" | grep -oE 'CODE=[0-9]+' | head -1 | cut -d= -f2)
-  [ "${code:-000}" = "000" ] && ok "cross-tenant $PEER → $TENANT DENIED" || no "cross-tenant isolation" "HTTP $code (expected 000)"
+  # Let's wrap the probe in the helper
+  x "out=\$(kubectl -n 'vcluster-$PEER-$ENV' run 'idp-probe-$$' --rm -i --restart=Never --image=curlimages/curl -- sh -c 'curl -m 5 -s -o /dev/null -w CODE=%{http_code} http://$APIP/' 2>/dev/null); code=\$(printf '%s' \"\$out\" | grep -oE 'CODE=[0-9]+' | head -1 | cut -d= -f2); [ \"\${code:-000}\" = '000' ]" "cross-tenant $PEER → $TENANT DENIED (HTTP 000)"
 else
-  skip "cross-tenant probe" "peer vcluster-$PEER-$ENV / service no disponible"
+  skip "cross-tenant probe" "peer vcluster-$PEER-$ENV / service not available"
 fi
 
 # ── Req 12 — external access (Gateway API + TLS) ────────────────────────────
 sec "Req 12 — external access"
-prog=$(kubectl -n "$NS" get gateway "$TENANT-gateway" -o jsonpath='{.status.conditions[?(@.type=="Programmed")].status}' 2>/dev/null)
-[ "$prog" = "True" ] && ok "Gateway Programmed" || no "Gateway Programmed" "${prog:-not found}"
-IP=$(kubectl -n "$NS" get gateway "$TENANT-gateway" -o jsonpath='{.status.addresses[0].value}' 2>/dev/null)
+x "[ \"\$(kubectl -n '$NS' get gateway '$TENANT-gateway' -o jsonpath='{.status.conditions[?(@.type==\"Programmed\")].status}' 2>/dev/null)\" = 'True' ]" "Gateway Programmed"
+IP=$(kubectl -n "$NS" get gateway "$TENANT-gateway" -o jsonpath='{.status.addresses[0].value}' 2>/dev/null || true)
 if [ -n "$IP" ]; then
   for app in web api; do
-    code=$(curl -k -m 5 -s -o /dev/null -w '%{http_code}' --resolve "$app.$TENANT.$DOMAIN:443:$IP" "https://$app.$TENANT.$DOMAIN/" 2>/dev/null)
-    [ "$code" = "200" ] && ok "HTTPS $app.$TENANT.$DOMAIN → 200" || no "HTTPS $app reachable" "HTTP ${code:-?}"
+    x "code=\$(curl -k -m 5 -s -o /dev/null -w '%{http_code}' --resolve '$app.$TENANT.$DOMAIN:443:$IP' 'https://$app.$TENANT.$DOMAIN/' 2>/dev/null); [ \"\$code\" = '200' ]" "HTTPS $app.$TENANT.$DOMAIN → 200"
   done
-else no "Gateway address" "no LB IP"; fi
-cert=$(kubectl -n "$NS" get certificate "$TENANT-tls" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null)
-[ "$cert" = "True" ] && ok "TLS cert $TENANT-tls Ready (cert-manager)" || skip "TLS cert" "${cert:-no cert (HTTP mode?)}"
+else
+  no "Gateway address" "no LB IP"
+fi
+cert=$(kubectl -n "$NS" get certificate "$TENANT-tls" -o jsonpath='{.status.conditions[?(@.type==\"Ready\")].status}' 2>/dev/null || true)
+if [ "$cert" = "True" ]; then
+  ok "TLS cert $TENANT-tls Ready (cert-manager)"
+else
+  skip "TLS cert" "${cert:-no cert (HTTP mode?)}"
+fi
 
 # ── Req 13 — scoped tenant access ───────────────────────────────────────────
 sec "Req 13 — tenant access"
-vc kubectl get ns >/dev/null 2>&1 && ok "vcluster connect → scoped kubeconfig" || no "vcluster connect"
+x "vcluster connect '$NS' -n '$NS' -- kubectl get ns" "vcluster connect → scoped kubeconfig"
 
 # ── Req 9 — idempotencia ────────────────────────────────────────────────────
 sec "Req 9 — idempotency"
-out=$(./cli/platform "$TENANT" create 2>&1; ./cli/platform "$TENANT" create 2>&1)
-echo "$out" | grep -qiE 'idempotent|nothing to commit' && ok "platform create x2 = idempotent" || no "idempotency" "no idempotent message"
+x "out=\$(./cli/platform '$TENANT' create 2>&1; ./cli/platform '$TENANT' create 2>&1); printf '%s' \"\$out\" | grep -qiE 'idempotent|nothing to commit'" "platform create x2 = idempotent"
 
 # ── Req 10/11 — failure handling / drift ────────────────────────────────────
 sec "Req 10/11 — failure handling / drift"
-kubectl -n "$ARGOCD_NS" get application "wl-$TENANT-$ENV" -o jsonpath='{.status.health.status}' 2>/dev/null \
-  | grep -q Healthy && ok "workload Healthy (sync waves + health gating, req 10)" || no "workload Healthy"
+x "[ \"\$(kubectl -n '$ARGOCD_NS' get application 'wl-$TENANT-$ENV' -o jsonpath='{.status.health.status}' 2>/dev/null)\" = 'Healthy' ]" "workload Healthy (sync waves + health gating, req 10)"
 if $DRIFT; then
   echo "  (drift) deleting $TENANT-customer-web; waiting for selfHeal…"
-  vc kubectl delete deployment "$TENANT-customer-web" -n "$VNS" >/dev/null 2>&1
-  for i in $(seq 1 18); do sleep 10; vc kubectl get deploy "$TENANT-customer-web" -n "$VNS" >/dev/null 2>&1 && break; done
-  vc kubectl get deploy "$TENANT-customer-web" -n "$VNS" >/dev/null 2>&1 \
-    && ok "drift self-heal: customer-web recreated (req 11)" || no "drift self-heal" "no recreado en 180s"
+  x "vcluster connect '$NS' -n '$NS' -- kubectl delete deployment '$TENANT-customer-web' -n '$VNS'" "drift manual trigger: delete customer-web"
+  recreated=false
+  for i in $(seq 1 18); do
+    sleep 10
+    if vcluster connect "$NS" -n "$NS" -- kubectl get deploy "$TENANT-customer-web" -n "$VNS" >/dev/null 2>&1; then
+      recreated=true
+      break
+    fi
+  done
+  if $recreated; then
+    ok "drift self-heal: customer-web recreated (req 11)"
+  else
+    no "drift self-heal" "not recreated within 180s"
+  fi
 else
-  skip "drift self-heal (req 11)" "destructivo; correr con --drift"
+  skip "drift self-heal (req 11)" "destructive; run with --drift"
 fi
 
 # ── Resumen ─────────────────────────────────────────────────────────────────

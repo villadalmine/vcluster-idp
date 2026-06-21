@@ -148,7 +148,7 @@ cmd_status() {
     exit 1
   fi
   local ns="$TENANT"   # namespace inside the vCluster
-  local kctx="--context vcluster-${TENANT}-${ENVIRONMENT}"  # the vCluster context
+  local vc_cmd="vcluster connect $VC_NS -n $VC_NS --"
 
   # Compute Age from the vCluster namespace on the host.
   local age="unknown"
@@ -168,9 +168,9 @@ cmd_status() {
   echo
   printf "Namespace: %s\n"        "$(component_status ns        "kubectl get ns $VC_NS")"
   printf "vCluster: %s\n"         "$(component_status vc        "kubectl get pods -n $VC_NS -l app=vcluster --field-selector=status.phase=Running")"
-  printf "PostgreSQL: %s\n"       "$(component_status pg        "kubectl get statefulset $ns-postgres -n $ns $kctx")"
-  printf "API Application: %s\n"  "$(component_status api       "kubectl get deploy $ns-customer-api -n $ns $kctx")"
-  printf "Web Application: %s\n"  "$(component_status web       "kubectl get deploy $ns-customer-web -n $ns $kctx")"
+  printf "PostgreSQL: %s\n"       "$(component_status pg        "$vc_cmd kubectl get statefulset $ns-postgres -n $ns")"
+  printf "API Application: %s\n"  "$(component_status api       "$vc_cmd kubectl get deploy $ns-customer-api -n $ns")"
+  printf "Web Application: %s\n"  "$(component_status web       "$vc_cmd kubectl get deploy $ns-customer-web -n $ns")"
   echo
   echo "Age: $age"
   echo
