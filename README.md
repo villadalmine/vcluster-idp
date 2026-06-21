@@ -495,8 +495,7 @@ multi-region / security Design Questions answered in §5.
 > **centralized easy-path**, the **CAPI regional fleet**, and the **recursive management-of-managements** —
 > showing for each one who creates the cluster, where the tenants' Git lives, and which Design Question it
 > answers. The full 8-variant spectrum (these three + the orthogonal HA / CNI / isolation / storage knobs) is
-> the table further below. *(Optional wiring detail: the full consume/connect graph is in
-> [`flow-management-of-managements.svg`](./flow-management-of-managements.svg).)*
+> the table further below.
 
 **Where each model's tenants live in Git (`region` = the partition label).** Decentralized GitOps gives every
 created host cluster its **own** ArgoCD, and they all read the **same** Git repo — so `region` is the label that
