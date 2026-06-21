@@ -2,6 +2,19 @@
 
 This repository implements a lightweight, declarative, and GitOps-driven **Internal Developer Platform (IDP)** designed to provision isolated development environments on-demand. 
 
+## 🎥 Platform Showcase (Full Read-Only Validation Demo)
+
+You can watch the complete passive validation of all platform architecture layers (from KubeVirt node virtualization, HAMi GPU sharing, Crossplane v2, and Cluster API (CAPI), to decentralized GitOps, tenant isolation, and external Gateway API + TLS) running on `srv-t7910` here:
+
+[![asciicast](https://asciinema.org/a/jr3CRkDl1eXs4pLr.svg)](https://asciinema.org/a/jr3CRkDl1eXs4pLr)
+
+To run the validation showcase yourself in real-time, execute:
+```bash
+./cli/showcase-platform
+```
+
+---
+
 Each tenant receives an isolated control plane (**vCluster**), a dedicated PostgreSQL database, two applications, auto-generated credentials, resource governance, network isolation, and external HTTPS access. The platform runs entirely through a GitOps facade (a CLI that commits to Git), allowing ArgoCD to reconcile and prune resources automatically.
 
 ---
@@ -106,7 +119,7 @@ If you do not have ArgoCD running or want to run a quick test without committing
 To see the CLI commands, automatic vCluster provisioning, sync waves, and E2E validation suite (`make validate`) running in real-time, you can watch the interactive terminal recording below:
 
 - [![asciinema  for tenant-creation play butt n](https://asciinema.org/img/play-button.png)](https://asciinema.org/a/ha0577C30eV22PwJ)
-- [![asciinema  for tenant Validation play butt n](https://asciinema.org/img/play-button.png)](https://asciinema.org/a/YExnzsktDB79rbtD)
+- [![asciinema  for tenant Validation play butt n](https://asciinema.org/img/play-button.png)](https://asciinema.org/a/KbTlRvky9mGqSoo9)
 
 
 

@@ -83,6 +83,10 @@ validate: ## Run the E2E validation test catalog on the cluster (TENANT=... ENV=
 validate-pod: ## Run E2E validation using a test pod for L7 checks (TENANT=... ENV=...)
 	@./cli/validate $(TENANT) $(ENV) --pod-test $(FLAGS)
 
+.PHONY: showcase
+showcase: ## Run the full read-only platform validation and showcase
+	@./cli/showcase-platform
+
 
 
 .PHONY: template

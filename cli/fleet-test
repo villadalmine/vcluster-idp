@@ -1,0 +1,131 @@
+#!/usr/bin/env bash
+# ═══════════════════════════════════════════════════════════════════════════
+# fleet-test — probar y DEMOSTRAR el fleet KubeVirt end-to-end (multi-cluster)
+# ───────────────────────────────────────────────────────────────────────────
+# Los host clusters exponen su API como ClusterIP (solo ruteable desde la red de
+# pods del management), así que este script habla con cada uno vía un *jump pod*
+# (idempotente: kubectl apply, se reusa). Desde el management:
+#
+#   cli/fleet-test check [cluster|all]      # valida cada capa (nodos/CNI/DNS/ArgoCD/vCluster)
+#   cli/fleet-test vclusters                # lista TODOS los vCluster de todos los clusters
+#   cli/fleet-test kc <cluster> <args...>   # kubectl passthrough a un host cluster
+#   cli/fleet-test vc <cluster> <vc> <args> # kubectl DENTRO de un vCluster
+#   cli/fleet-test dns <cluster>            # test de DNS cross-node (la validación del MTU)
+#   cli/fleet-test demo                     # barrido completo (check all + vclusters)
+#   cli/fleet-test clean                    # borra los jump/test pods
+#
+# Idempotente: todo es apply/reuse; los test pods se recrean limpios.
+# ═══════════════════════════════════════════════════════════════════════════
+set -uo pipefail
+NS=fleet
+IMG=alpine/k8s:1.31.0
+ALL="host-a host-b host-c host-mgmt host-euw1"
+
+c0() { printf "\033[%sm%s\033[0m" "$1" "$2"; }
+hdr(){ echo; echo "$(c0 '1;36' "══ $* ══")"; }
+ok() { echo "  $(c0 '1;32' '✔') $*"; }
+no() { echo "  $(c0 '1;31' '✗') $*"; }
+inf(){ echo "  $(c0 '1;34' '·') $*"; }
+warn(){ echo "  $(c0 '1;33' '⚠') $*"; }
+
+ensure_jump() { # idempotente: crea el jump pod si no está
+  local c=$1
+  kubectl -n $NS get secret "${c}-kubeconfig" >/dev/null 2>&1 || { warn "$c: sin kubeconfig (¿existe el cluster?)"; return 1; }
+  if ! kubectl -n $NS get pod "jump-$c" >/dev/null 2>&1; then
+    kubectl -n $NS apply -f - >/dev/null 2>&1 <<EOF
+apiVersion: v1
+kind: Pod
+metadata: { name: jump-$c, namespace: $NS, labels: { app: fleet-test-jump } }
+spec:
+  restartPolicy: Never
+  volumes: [{ name: kc, secret: { secretName: ${c}-kubeconfig } }]
+  containers: [{ name: p, image: $IMG, command: ["sleep","7200"], volumeMounts: [{ name: kc, mountPath: /kc }] }]
+EOF
+  fi
+  kubectl -n $NS wait --for=condition=Ready "pod/jump-$c" --timeout=90s >/dev/null 2>&1
+}
+
+kc() {
+  local c=$1; shift
+  if [ -t 0 ]; then
+    timeout 30 kubectl -n $NS exec "jump-$c" -- kubectl --kubeconfig=/kc/value "$@" 2>&1
+  else
+    timeout 30 kubectl -n $NS exec -i "jump-$c" -- kubectl --kubeconfig=/kc/value "$@" 2>&1
+  fi
+}
+
+dns_test() { # test DNS cross-node (worker→CoreDNS) — la validación del MTU. Idempotente.
+  local c=$1
+  kc "$c" -n default delete pod fleet-dnstest --ignore-not-found >/dev/null 2>&1
+  kc "$c" -n default apply -f - >/dev/null 2>&1 <<'EOF'
+apiVersion: v1
+kind: Pod
+metadata: { name: fleet-dnstest, namespace: default }
+spec:
+  affinity: { nodeAffinity: { requiredDuringSchedulingIgnoredDuringExecution: { nodeSelectorTerms: [{ matchExpressions: [{ key: node-role.kubernetes.io/control-plane, operator: DoesNotExist }] }] }}}
+  containers: [{ name: c, image: busybox:1.36, command: ["sh","-c","nslookup kubernetes.default 2>&1 | grep -qi address && echo OK || echo FAIL"] }]
+  restartPolicy: Never
+EOF
+  local i; for i in $(seq 1 20); do
+    [ "$(kc "$c" -n default get pod fleet-dnstest -o jsonpath='{.status.phase}' 2>/dev/null)" = "Succeeded" ] && break; sleep 3
+  done
+  kc "$c" -n default logs fleet-dnstest 2>/dev/null | tr -d '\r' | tail -1
+}
+
+check() {
+  local c=$1
+  hdr "CLUSTER $c"
+  ensure_jump "$c" || return
+  # capa CAPI (mgmt-side)
+  local phase=$(kubectl -n $NS get cluster "$c" -o jsonpath='{.status.phase}' 2>/dev/null)
+  local cpr=$(kubectl -n $NS get cluster "$c" -o jsonpath='{.status.controlPlaneReady}' 2>/dev/null)
+  [ "$cpr" = "true" ] && ok "CAPI: phase=$phase controlPlaneReady=true" || no "CAPI: phase=$phase controlPlaneReady=$cpr"
+  # nodos
+  local nodes ready
+  nodes=$(kc "$c" get nodes --no-headers 2>/dev/null); ready=$(echo "$nodes" | grep -cw Ready)
+  [ "$ready" -ge 1 ] && ok "nodos Ready: $ready" || no "nodos: $(echo "$nodes" | head -1)"
+  # CNI
+  local cni; cni=$(kc "$c" -n kube-system get pods --no-headers 2>/dev/null | grep -iE 'calico|cilium' | grep -c Running)
+  [ "$cni" -ge 1 ] && ok "CNI pods Running: $cni" || no "CNI: sin pods Running"
+  # DNS cross-node (MTU)
+  local d; d=$(dns_test "$c"); [ "$d" = "OK" ] && ok "DNS cross-node (MTU): OK" || no "DNS cross-node: $d  ← revisar MTU (FLEET-KUBEVIRT-NETWORKING.md)"
+  # StorageClass
+  local sc; sc=$(kc "$c" get storageclass --no-headers 2>/dev/null | grep -c .); [ "$sc" -ge 1 ] && ok "StorageClass: $sc" || warn "StorageClass: ninguna (PVCs quedan Pending)"
+  # ArgoCD (si role=management)
+  local role; role=$(kubectl -n $NS get hostcluster "$c" -o jsonpath='{.spec.role}' 2>/dev/null)
+  if [ "$role" = "management" ]; then
+    local apps; apps=$(kc "$c" -n argocd get applications --no-headers 2>/dev/null | grep -c .)
+    [ "$apps" -ge 1 ] && ok "ArgoCD propio: $apps apps" || warn "ArgoCD: sin apps (¿region-root sembrado?)"
+    kc "$c" -n argocd get applications --no-headers 2>/dev/null | grep -iv 'Synced.*Healthy' | sed 's/^/      ⚠ /' | head
+    # vClusters
+    local vcs; vcs=$(kc "$c" get ns --no-headers 2>/dev/null | grep -c '^vcluster-')
+    [ "$vcs" -ge 1 ] && ok "vClusters: $vcs" || inf "vClusters: 0 (aún)"
+    kc "$c" get pods -A --no-headers 2>/dev/null | grep vcluster- | awk '{print "      vc:",$2,$4}' | head
+  fi
+}
+
+list_vclusters() {
+  hdr "TODOS los vClusters del fleet"
+  local c
+  for c in $ALL; do
+    local role; role=$(kubectl -n $NS get hostcluster "$c" -o jsonpath='{.spec.role}' 2>/dev/null)
+    [ "$role" = "management" ] || continue
+    ensure_jump "$c" >/dev/null 2>&1 || continue
+    echo "  [$c]"
+    kc "$c" get ns --no-headers 2>/dev/null | grep '^vcluster-' | awk '{print "    -",$1,"("$2")"}' || echo "    (ninguno)"
+  done
+}
+
+clean() { kubectl -n $NS delete pod -l app=fleet-test-jump --ignore-not-found 2>&1; for c in $ALL; do kc "$c" -n default delete pod fleet-dnstest --ignore-not-found >/dev/null 2>&1; done; echo "limpio."; }
+
+cmd=${1:-demo}; shift || true
+case "$cmd" in
+  check)   t=${1:-all}; if [ "$t" = all ]; then for c in $ALL; do check "$c"; done; else check "$t"; fi ;;
+  vclusters) list_vclusters ;;
+  dns)     ensure_jump "$1" && { echo -n "DNS cross-node $1: "; dns_test "$1"; } ;;
+  kc)      c=$1; shift; ensure_jump "$c" && kc "$c" "$@" ;;
+  vc)      c=$1; v=$2; shift 2; ensure_jump "$c" && kc "$c" -n "$v" exec "deploy/$v" -- /bin/sh -c "kubectl $*" 2>&1 || warn "para entrar al vCluster usá: vcluster connect <v> -n <v> (desde el host)" ;;
+  demo)    for c in $ALL; do check "$c"; done; list_vclusters ;;
+  clean)   clean ;;
+  *) echo "uso: cli/fleet-test {check [cluster|all]|vclusters|dns <c>|kc <c> <args>|demo|clean}"; exit 1 ;;
+esac

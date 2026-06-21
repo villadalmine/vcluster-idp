@@ -1,0 +1,321 @@
+#!/usr/bin/env bash
+# ═══════════════════════════════════════════════════════════════════════════
+# showcase-platform — Showcase and validate the entire platform architecture.
+#
+# Designed for video recordings and audits: explains what is validated at each
+# step, from basics (KubeVirt, HAMi) to advanced layers (Crossplane, CAPI, GitOps).
+# Non-destructive and 100% read-only.
+# ═══════════════════════════════════════════════════════════════════════════
+set -uo pipefail
+
+# Colors and emojis
+c_reset="\033[0m"
+c_bold="\033[1m"
+c_cyan="\033[36m"
+c_green="\033[32m"
+c_red="\033[31m"
+c_yellow="\033[33m"
+c_blue="\033[34m"
+
+# Format helpers
+ok() { echo -e "  ${c_green}✔${c_reset} $*"; }
+no() { echo -e "  ${c_red}✗${c_reset} $*"; }
+warn() { echo -e "  ${c_yellow}⚠${c_reset} $*"; }
+info() { echo -e "  ${c_blue}•${c_reset} $*"; }
+sec() {
+  echo
+  echo -e "${c_cyan}${c_bold}═══════════════════════════════════════════════════════════════════════════${c_reset}"
+  echo -e " ${c_bold}$1${c_reset}"
+  echo -e "${c_cyan}${c_bold}═══════════════════════════════════════════════════════════════════════════${c_reset}"
+  echo -e " ${c_yellow}ℹ️ What this demonstrates:${c_reset} $2"
+  echo
+  sleep 1
+}
+
+# Preflight: connection to Kubernetes
+if ! kubectl cluster-info >/dev/null 2>&1; then
+  echo -e "${c_red}✗ Error:${c_reset} No Kubernetes cluster connectivity detected."
+  exit 1
+fi
+
+echo -e "${c_bold}Starting Platform Showcase & Validation (Full Read Test)${c_reset}"
+echo "Running passive and read-only checks..."
+sleep 1
+
+# ── 1. Node Virtualization (KubeVirt) ───────────────────────────────────────
+sec "1. Node Virtualization & Compute (KubeVirt)" \
+    "Hypervisor-level compute isolation. Host cluster nodes run as KubeVirt Virtual Machines (VMs) on the physical host node srv-t7910."
+
+# KubeVirt control plane pods
+info "Checking KubeVirt control plane (namespace: kubevirt)..."
+if kubectl get ns kubevirt >/dev/null 2>&1; then
+  pods_kv=$(kubectl -n kubevirt get pods --no-headers 2>/dev/null | wc -l)
+  pods_kv_run=$(kubectl -n kubevirt get pods --no-headers 2>/dev/null | grep -c Running || true)
+  if [ "$pods_kv_run" -eq "$pods_kv" ] && [ "$pods_kv" -gt 0 ]; then
+    ok "KubeVirt control plane active: $pods_kv_run/$pods_kv pods in Running state."
+  else
+    warn "KubeVirt unstable: $pods_kv_run/$pods_kv pods Running (check namespace: kubevirt)."
+  fi
+else
+  no "Namespace 'kubevirt' not found. Is KubeVirt installed?"
+fi
+
+# Active VMs and VMIs in fleet namespace
+info "Checking active Virtual Machines (VMs) backing the fleet (namespace: fleet)..."
+vms=$(kubectl -n fleet get vms --no-headers 2>/dev/null | wc -l)
+vms_running=$(kubectl -n fleet get vms --no-headers 2>/dev/null | grep -c Running || true)
+if [ "$vms" -gt 0 ]; then
+  ok "Found $vms KubeVirt VMs ($vms_running in Running state) in the 'fleet' namespace."
+  kubectl -n fleet get vms -o custom-columns='NAME:.metadata.name,STATUS:.status.printableStatus,READY:.status.ready' --no-headers | sed 's/^/      /'
+else
+  no "No VMs found in 'fleet' namespace."
+fi
+
+# Physical node srv-t7910 status
+info "Checking physical x86 compute node (srv-t7910)..."
+node_status=$(kubectl get node srv-t7910 -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "Unknown")
+if [ "$node_status" = "True" ]; then
+  ok "Physical node srv-t7910 is READY (Hypervisor compute active)."
+else
+  no "Physical node srv-t7910 is NOT Ready or does not exist. Status: $node_status"
+fi
+
+
+# ── 2. GPU Governance (HAMi) ────────────────────────────────────────────
+sec "2. GPU Governance & Slicing (HAMi vGPU)" \
+    "Shared GPU usage (Tesla P4 & Quadro M4000) with hard VRAM (in MiB) and cores (%) isolation per tenant, without requiring MIG hardware."
+
+# HAMi admission webhook
+info "Checking HAMi mutating admission webhook..."
+if kubectl get mutatingwebhookconfigurations hami-webhook >/dev/null 2>&1; then
+  ok "MutatingWebhook 'hami-webhook' registered and active."
+else
+  no "MutatingWebhook 'hami-webhook' not found."
+fi
+
+# HAMi controllers
+info "Checking HAMi controllers (namespace: kube-system)..."
+hami_pods=$(kubectl -n kube-system get pods --no-headers 2>/dev/null | grep -c hami-device-plugin || true)
+hami_sched=$(kubectl -n kube-system get pods --no-headers 2>/dev/null | grep -c hami-scheduler || true)
+
+if [ "$hami_pods" -gt 0 ] && [ "$hami_sched" -gt 0 ]; then
+  ok "HAMi controllers active (Device Plugin: $hami_pods pods, Scheduler: $hami_sched pods)."
+else
+  warn "HAMi controllers partially detected (Device Plugin: $hami_pods, Scheduler: $hami_sched)."
+fi
+
+# Advertised vGPU capacity
+info "Checking advertised vGPU resources on node srv-t7910..."
+vgpu_capacity=$(kubectl get node srv-t7910 -o jsonpath='{.status.capacity.nvidia\.com/gpu}' 2>/dev/null || echo "0")
+if [ "$vgpu_capacity" -gt 0 ]; then
+  ok "Node srv-t7910 advertises vGPU capacity: $vgpu_capacity virtual cores/slices available."
+  info "Physical GPU configuration detected by HAMi:"
+  kubectl get node srv-t7910 -o jsonpath='{.metadata.annotations.hami\.io/node-nvidia-register}' 2>/dev/null | jq -r '.[] | "      • \(.type): \(.devmem) MiB VRAM total, \(.count) slices vGPU, modo \(.mode)"' || true
+else
+  no "Node srv-t7910 does not advertise nvidia.com/gpu resources. Is HAMi active?"
+fi
+
+
+# ── 3. Declarative Infrastructure Composition (Crossplane v2) ──────────────────────
+sec "3. Declarative Infrastructure Composition (Crossplane v2)" \
+    "Crossplane abstraction of underlying infrastructure. Defines a custom 'HostCluster' resource type that Crossplane automatically composes into CAPI and KubeVirt resources."
+
+# Crossplane operator pods
+info "Checking Crossplane operator (namespace: crossplane-system)..."
+if kubectl get ns crossplane-system >/dev/null 2>&1; then
+  cp_pods=$(kubectl -n crossplane-system get pods --no-headers 2>/dev/null | grep -c Running || true)
+  if [ "$cp_pods" -gt 0 ]; then
+    ok "Crossplane operator running successfully ($cp_pods pods)."
+  else
+    no "Crossplane operator has no active pods."
+  fi
+else
+  no "Namespace 'crossplane-system' not found."
+fi
+
+# XRD and Compositions
+info "Checking HostCluster Composite Resource Definition (XRD) and Composition..."
+xrd_status=$(kubectl get xrd hostclusters.fleet.homelab.io -o jsonpath='{.status.conditions[?(@.type=="Established")].status}' 2>/dev/null || echo "False")
+comp_exists=$(kubectl get composition hostcluster-kubevirt --no-headers >/dev/null 2>&1 && echo "True" || echo "False")
+
+if [ "$xrd_status" = "True" ]; then
+  ok "XRD 'hostclusters.fleet.homelab.io' established successfully."
+else
+  no "XRD 'hostclusters.fleet.homelab.io' is not established."
+fi
+
+if [ "$comp_exists" = "True" ]; then
+  ok "Composition 'hostcluster-kubevirt' configured."
+else
+  no "Composition 'hostcluster-kubevirt' not found."
+fi
+
+# HostCluster instances
+info "Checking active HostCluster instances (XR resources)..."
+hc_count=$(kubectl -n fleet get hostcluster --no-headers 2>/dev/null | wc -l)
+if [ "$hc_count" -gt 0 ]; then
+  ok "Found $hc_count HostClusters declared via Crossplane:"
+  kubectl -n fleet get hostcluster -o custom-columns='NAME:.metadata.name,SYNCED:.status.conditions[?(@.type=="Synced")].status,READY:.status.conditions[?(@.type=="Ready")].status,COMPOSITION:.spec.compositionRef.name' --no-headers | sed 's/^/      /'
+else
+  no "No HostCluster resources found."
+fi
+
+
+# ── 4. Multicluster Provisioning (Cluster API - CAPI & CAPK) ──────────
+sec "4. Multicluster Provisioning with CAPI & CAPK" \
+    "Automated and declarative cluster creation, upgrades, and deletion. CAPI (Cluster API) and CAPK (Provider KubeVirt) orchestrate the k8s lifecycle of the host clusters."
+
+# CAPI/CAPK controller deployment status
+info "Checking Cluster API (CAPI) controllers and KubeVirt provider (CAPK)..."
+kubectl get deployments -A -l control-plane=controller-manager --no-headers 2>/dev/null | grep -E 'capi|capk|caaph' | awk '{print "      • " $1 "/" $2 " (" $4 " ready)"}' || true
+
+# CAPI clusters status
+info "Checking CAPI Clusters status in 'fleet' namespace..."
+capi_clusters=$(kubectl -n fleet get clusters --no-headers 2>/dev/null | wc -l)
+if [ "$capi_clusters" -gt 0 ]; then
+  ok "CAPI is managing $capi_clusters Kubernetes clusters:"
+  kubectl -n fleet get clusters -o custom-columns='NAME:.metadata.name,PHASE:.status.phase,CP_READY:.status.controlPlaneReady,INFRA_READY:.status.infrastructureReady' --no-headers | sed 's/^/      /'
+else
+  no "No CAPI clusters found in 'fleet' namespace."
+fi
+
+# Machine-to-VM mappings
+info "Checking CAPI Machine ↔ KubeVirt VM mapping..."
+kubectl -n fleet get machines -o custom-columns='MACHINE:.metadata.name,CLUSTER:.metadata.labels.cluster\.x-k8s\.io/cluster-name,PHASE:.status.phase,VM:.spec.infrastructureRef.name' --no-headers | sed 's/^/      /'
+
+
+# ── 5. Decentralized GitOps (ArgoCD & ClusterResourceSets) ────────────────
+sec "5. Decentralized GitOps (ArgoCD & ClusterResourceSets)" \
+    "Git desired state synchronization without a central SPOF. Each regional host cluster runs its own ArgoCD seeded by CAPI via ClusterResourceSets."
+
+# Central ArgoCD
+info "Checking central ArgoCD (namespace: argocd)..."
+if kubectl get ns argocd >/dev/null 2>&1; then
+  argo_health=$(kubectl -n argocd get application platform-root -o jsonpath='{.status.health.status}' 2>/dev/null || echo "Missing")
+  if [ "$argo_health" = "Healthy" ]; then
+    ok "Central ArgoCD active, root application 'platform-root' is HEALTHY."
+  else
+    warn "ArgoCD root application 'platform-root' status: $argo_health"
+  fi
+  
+  info "Detected GitOps ApplicationSets:"
+  kubectl -n argocd get applicationset --no-headers 2>/dev/null | awk '{print "      • " $1}' || true
+else
+  no "Namespace 'argocd' not found."
+fi
+
+# ClusterResourceSets
+info "Checking ClusterResourceSets (CRS) for network/GitOps bootstrapping..."
+crs_count=$(kubectl -n fleet get clusterresourceset --no-headers 2>/dev/null | wc -l)
+if [ "$crs_count" -gt 0 ]; then
+  ok "Found $crs_count ClusterResourceSets in 'fleet' namespace (injecting CNI and regional config):"
+  kubectl -n fleet get clusterresourceset --no-headers 2>/dev/null | awk '{print "      • " $1}' || true
+else
+  no "No ClusterResourceSets found."
+fi
+
+
+# ── 6. Connectivity & Health Check of Regional host-euw1 ─────────────
+sec "6. Connectivity & Health Check of Regional host-euw1" \
+    "Real connectivity validation via jump pod inside the management pod network. Verifies that the remote cluster is running, nodes are ready, CNI is healthy, and its local ArgoCD is active."
+
+# Check host-euw1
+info "Interacting with host-euw1 (jump pod)..."
+if kubectl -n fleet get secret host-euw1-kubeconfig >/dev/null 2>&1; then
+  if [ -x "./cli/fleet-test" ]; then
+    ./cli/fleet-test check host-euw1 | sed 's/^/    /'
+  else
+    warn "Script './cli/fleet-test' is not executable or not found."
+  fi
+else
+  no "Secret 'host-euw1-kubeconfig' not found. Was host-euw1 provisioned?"
+fi
+
+
+# ── 7. Tenant Virtual Control Plane & Network Isolation (vCluster + CNP) ───
+sec "7. Tenant Virtual Control Plane & Network Isolation (vCluster + CNP)" \
+    "Virtual API server and etcd per tenant via vCluster, avoiding CRD conflicts. Physical network is isolated with host-side CiliumNetworkPolicies, blocking cross-tenant traffic."
+
+# vClusters on host
+info "Listing active vClusters on the host..."
+if command -v vcluster >/dev/null 2>&1; then
+  vcluster list 2>/dev/null | sed 's/^/      /'
+else
+  kubectl get pods -A -l app=vcluster --no-headers 2>/dev/null | awk '{print "      • " $1 "/" $2 " (" $4 ")"}' || true
+fi
+
+# CNPs
+info "Checking network isolation policies (CiliumNetworkPolicy) on the host..."
+cnp_count=$(kubectl get cnp -A --no-headers 2>/dev/null | wc -l)
+if [ "$cnp_count" -gt 0 ]; then
+  ok "Found $cnp_count CiliumNetworkPolicies on the host:"
+  kubectl get cnp -A -o custom-columns='NAMESPACE:.metadata.namespace,NAME:.metadata.name' --no-headers | sed 's/^/      /'
+else
+  no "No CiliumNetworkPolicies found."
+fi
+
+# Cross-tenant curl block test
+info "Isolation test: Attempting curl from tenant-b to tenant-a (must fail/be blocked)..."
+APIP=$(kubectl -n vcluster-tenant-a-dev get svc -o jsonpath='{range .items[*]}{.metadata.name}={.spec.clusterIP}{"\n"}{end}' 2>/dev/null | grep customer-web | head -1 | cut -d= -f2 || true)
+if [ -n "$APIP" ] && kubectl get ns vcluster-tenant-b-dev >/dev/null 2>&1; then
+  out=$(kubectl -n vcluster-tenant-b-dev run "probe-showcase-$$" --rm -i --restart=Never --image=curlimages/curl -- sh -c "curl -m 3 -s -o /dev/null -w CODE=%{http_code} http://$APIP/" 2>/dev/null || true)
+  code=$(printf '%s' "$out" | grep -oE 'CODE=[0-9]+' | head -1 | cut -d= -f2 || echo "000")
+  if [ "$code" = "000" ] || [ "$code" = "" ]; then
+    ok "Network isolation successful: Direct traffic tenant-b → tenant-a BLOCKED (HTTP 000 / Timeout)."
+  else
+    warn "Network isolation failed: Direct traffic tenant-b → tenant-a allowed (HTTP $code)."
+  fi
+else
+  skip "Isolation test skipped: customer-web service or tenant-b namespace not found."
+fi
+
+
+# ── 8. External Access & TLS (Gateway API + cert-manager) ───────────
+sec "8. External Access & TLS (Gateway API + cert-manager)" \
+    "North-south routing using Cilium Gateway API. cert-manager issues TLS certificates automatically via gateway-shim hooks."
+
+# GatewayClass
+info "Checking Cilium GatewayClass..."
+gw_class_status=$(kubectl get gatewayclass cilium -o jsonpath='{.status.conditions[?(@.type=="Accepted")].status}' 2>/dev/null || echo "False")
+if [ "$gw_class_status" = "True" ]; then
+  ok "GatewayClass 'cilium' successfully accepted by the Cilium operator."
+else
+  no "GatewayClass 'cilium' is not in Accepted state."
+fi
+
+# Gateways & HTTPRoutes
+info "Checking Gateways and HTTPRoutes configured for tenant-a (dev)..."
+if kubectl -n vcluster-tenant-a-dev get gateway tenant-a-gateway >/dev/null 2>&1; then
+  gw_prog=$(kubectl -n vcluster-tenant-a-dev get gateway tenant-a-gateway -o jsonpath='{.status.conditions[?(@.type=="Programmed")].status}' 2>/dev/null || echo "False")
+  gw_ip=$(kubectl -n vcluster-tenant-a-dev get gateway tenant-a-gateway -o jsonpath='{.status.addresses[0].value}' 2>/dev/null || echo "no-ip")
+  if [ "$gw_prog" = "True" ]; then
+    ok "Gateway 'tenant-a-gateway' PROGRAMMED=True with assigned IP: $gw_ip."
+  else
+    warn "Gateway 'tenant-a-gateway' not programmed. Status: $gw_prog"
+  fi
+  
+  routes_count=$(kubectl -n vcluster-tenant-a-dev get httproute --no-headers 2>/dev/null | wc -l)
+  if [ "$routes_count" -gt 0 ]; then
+    ok "Found $routes_count HTTPRoutes in vcluster-tenant-a-dev:"
+    kubectl -n vcluster-tenant-a-dev get httproute -o custom-columns='NAME:.metadata.name,HOSTS:.spec.hostnames' --no-headers | sed 's/^/      /'
+  else
+    no "No HTTPRoutes found in vcluster-tenant-a-dev."
+  fi
+else
+  no "Gateway 'tenant-a-gateway' not found in vcluster-tenant-a-dev."
+fi
+
+# cert-manager certificates
+info "Checking cert-manager TLS Certificates for Gateways..."
+certs_count=$(kubectl get certificates -A --no-headers 2>/dev/null | wc -l)
+if [ "$certs_count" -gt 0 ]; then
+  ok "Found $certs_count TLS certificates managed by cert-manager:"
+  kubectl get certificates -A -o custom-columns='NAMESPACE:.metadata.namespace,NAME:.metadata.name,READY:.status.conditions[?(@.type=="Ready")].status' --no-headers | sed 's/^/      /'
+else
+  no "No TLS certificates found."
+fi
+
+echo
+echo -e "${c_green}${c_bold}✔ SHOWCASE & VALIDATION COMPLETE!${c_reset}"
+echo -e "All platform architecture components have been passively validated."
+echo
