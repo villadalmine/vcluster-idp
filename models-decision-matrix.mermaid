@@ -1,0 +1,54 @@
+%% The three cluster-topology models demonstrated live, and the requirement (Design Question)
+%% each one answers. Source of the SVG (render: mmdc -i this.mermaid -o models-decision-matrix.svg).
+%% Key idea: "region" is just a partition label for DECENTRALIZED ArgoCD — it only appears once a
+%% created host cluster runs its OWN ArgoCD (Models 2 & 3), never in the single-ArgoCD easy path (Model 1).
+flowchart TB
+  GIT["Git (vcluster-idp)\nsingle source of truth"]:::git
+
+  subgraph ROOT["ROOT k3s — MANAGEMENT + HYPERVISOR (physical nodes)"]
+    direction TB
+    rArgo["central ArgoCD\n(platform-root)"]:::argo
+    rInfra["CAPI + CAPK + Crossplane v2\nKubeVirt / CDI / Longhorn"]:::capi
+    subgraph M1["1 - EASY PATH (centralized)"]
+      direction TB
+      m1note["no 'region':\none ArgoCD deploys every tenant here"]:::note
+      rVC["vClusters in Root namespaces\ntenant-a / b / c / x / y"]:::vc
+    end
+    rArgo --> rVC
+  end
+  GIT --> rArgo
+
+  subgraph M2["2 - CAPI REGIONAL (Root creates a workload cluster)"]
+    direction TB
+    hEUW1["host-euw1  ·  role=regional  ·  region=eu-west1\n1 control-plane (no tenants) + 1 worker  (KubeVirt VMs)"]:::host
+    eArgo["OWN ArgoCD  <-  region-root\ngit: clusters/regions/eu-west1/tenants/"]:::argo
+    eVC["vCluster tenant-a (regional)\nruns on the worker"]:::vc
+    hEUW1 --> eArgo --> eVC
+  end
+  rInfra -- "creates VMs (CAPK)\n+ seeds ArgoCD / CNI / region-root" --> hEUW1
+
+  subgraph M3["3 - RECURSIVE (management-of-managements)"]
+    direction TB
+    hMGMT["host-mgmt  ·  role=management\nruns CAPI + CAAPH  ·  hosts NO tenants"]:::mgmt
+    mc["mgmt-child  ·  role=regional  ·  region=mc-euw1\n1 control-plane (no tenants) + 1 worker  (KubeVirt VMs)"]:::host
+    cArgo["OWN ArgoCD  <-  region-root\ngit: clusters/regions/mc-euw1/tenants/"]:::argo
+    cVC["vCluster tenant-z\nruns on the worker"]:::vc
+    hMGMT -- "creates + delivers the SAME stack\n(ArgoCD + region-root + CNI)" --> mc --> cArgo --> cVC
+  end
+  rInfra -- "creates VMs (CAPK)\n+ installs full CAPI + CAAPH" --> hMGMT
+
+  dq1["DQ1: ~10 tenants, single cluster\nDQ2: templated  ·  DQ6: per-tenant isolation"]:::dq
+  dq2["DQ1: 100 / 1000 fleet  ·  DQ3: GitOps\nDQ5: multi-region (no central SPOF)"]:::dq
+  dq3["DQ1: hierarchical fleet,\nrecursive scaling"]:::dq
+  M1 -. answers .-> dq1
+  M2 -. answers .-> dq2
+  M3 -. answers .-> dq3
+
+  classDef git fill:#f4f4f4,stroke:#999999,color:#222222;
+  classDef argo fill:#fde7c8,stroke:#e08e0b,color:#5a3a00;
+  classDef capi fill:#dbeafe,stroke:#2563eb,color:#13315c;
+  classDef host fill:#dcfce7,stroke:#16a34a,color:#14532d;
+  classDef mgmt fill:#ede9fe,stroke:#7c3aed,color:#3b0764;
+  classDef vc fill:#cffafe,stroke:#0891b2,color:#083344;
+  classDef dq fill:#fee2e2,stroke:#dc2626,color:#7f1d1d;
+  classDef note fill:#fffbeb,stroke:#d97706,color:#78350f;
