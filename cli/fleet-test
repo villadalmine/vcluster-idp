@@ -75,6 +75,12 @@ kc() {
   fi
 }
 
+# Map a guest node (a KubeVirt VM) to the REAL hypervisor node it runs on. The guest node name equals the
+# VMI name; the VMI lives in the management cluster (any namespace) and .status.nodeName is the bare-metal node.
+vmi_node() {
+  kubectl get vmi -A --field-selector "metadata.name=$1" -o jsonpath='{.items[0].status.nodeName}' 2>/dev/null
+}
+
 dns_test() { # cross-node DNS test (worker→CoreDNS) — the MTU validation. Idempotent.
   local c=$1
   kc "$c" -n default delete pod fleet-dnstest --ignore-not-found >/dev/null 2>&1
@@ -107,12 +113,15 @@ check() {
   else
     inf "CAPI: n/a (not a Root-managed Cluster — reached via its kubeconfig)"
   fi
-  # Nodes (with names + roles)
+  # Nodes (with names + roles + the real KubeVirt hypervisor node each VM runs on)
   local nodes ready
   nodes=$(kc "$c" get nodes --no-headers 2>/dev/null); ready=$(echo "$nodes" | grep -cw Ready)
   if [ "$ready" -ge 1 ]; then
     ok "nodes Ready: $ready"
-    echo "$nodes" | awk 'NF{print "      - "$1"  "$2"  ("$3")"}'
+    echo "$nodes" | awk 'NF{print $1"\t"$2"\t"$3}' | while IFS=$'\t' read -r n st role; do
+      rn=$(vmi_node "$n")
+      if [ -n "$rn" ]; then li "$n  $st  ($role)  → VM on hypervisor node: $rn"; else li "$n  $st  ($role)"; fi
+    done
   else
     no "nodes: $(echo "$nodes" | head -1)"
   fi
@@ -127,8 +136,9 @@ check() {
   fi
   # Cross-node DNS (MTU)
   local d; d=$(dns_test "$c"); [ "$d" = "OK" ] && ok "cross-node DNS (MTU): OK" || no "cross-node DNS: $d  <- check MTU (FLEET-KUBEVIRT-NETWORKING.md)"
-  # StorageClass (with names)
-  local scs; scs=$(kc "$c" get storageclass --no-headers 2>/dev/null); local sc; sc=$(echo "$scs" | grep -c .)
+  # StorageClass (with names) — filter kubectl's "No resources found" so it is not miscounted as a class
+  local scs; scs=$(kc "$c" get storageclass --no-headers 2>/dev/null | grep -vi 'no resources found')
+  local sc; sc=$(echo "$scs" | grep -c .)
   if [ "$sc" -ge 1 ]; then
     ok "StorageClasses: $sc"
     echo "$scs" | awk 'NF{print "      - "$1}'
