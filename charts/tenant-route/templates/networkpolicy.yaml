@@ -13,10 +13,10 @@ metadata:
   labels:
     {{- include "route.labels" . | nindent 4 }}
 spec:
-  # SOLO los pods del WORKLOAD del tenant — NO los del control-plane del vCluster
-  # (vcluster-<t>-0, coredns) que viven en el mismo namespace del host. Si seleccionás
-  # todo ({}), el default-deny bloquea el acceso de ArgoCD/plataforma al API del vCluster
-  # (i/o timeout → cache stale → no sync). Lección de shared-nodes.
+  # ONLY the tenant's WORKLOAD pods — NOT the vCluster control-plane ones
+  # (vcluster-<t>-0, coredns) that live in the same host namespace. If you select
+  # everything ({}), the default-deny blocks ArgoCD/platform access to the vCluster API
+  # (i/o timeout → stale cache → no sync). A shared-nodes lesson.
   endpointSelector:
     matchLabels:
       app.kubernetes.io/part-of: idp-platform

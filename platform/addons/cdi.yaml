@@ -1,6 +1,6 @@
-# Child app of platform-root: CDI (importer de discos de VM). Permite que el disco de la VM
-# sea un DataVolume sobre Longhorn (el "vSAN") en vez del containerDisk efímero. sync-wave 1
-# (con kubevirt/crossplane/operator).
+# Child app of platform-root: CDI (VM disk importer). Lets the VM disk be a
+# DataVolume on Longhorn (the "vSAN") instead of the ephemeral containerDisk. sync-wave 1
+# (with kubevirt/crossplane/operator).
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -21,13 +21,13 @@ spec:
     automated: { prune: true, selfHeal: true }
     syncOptions:
       - CreateNamespace=true
-      - ServerSideApply=true          # los CRDs de CDI son grandes
+      - ServerSideApply=true          # CDI's CRDs are large
       - SkipDryRunOnMissingResource=true
-      - RespectIgnoreDifferences=true # selfHeal no pelea con el schema que reescribe cdi-operator
-  # OutOfSync benigno: el cdi-operator es co-dueño del CRD cdis.cdi.kubevirt.io. ArgoCD aplica vía SSA y
-  # sólo posee spec.group/names/scope; el operator gestiona spec.versions y reescribe/normaliza el
+      - RespectIgnoreDifferences=true # selfHeal doesn't fight the schema the cdi-operator rewrites
+  # Benign OutOfSync: the cdi-operator co-owns the cdis.cdi.kubevirt.io CRD. ArgoCD applies via SSA and
+  # only owns spec.group/names/scope; the operator manages spec.versions and rewrites/normalizes the
   # openAPIV3Schema (CRD ~89KB) tras el apply -> diff permanente aunque CDI funcione. En vez de listar
-  # punteros frágiles del schema, ignoramos por OWNER: todo lo que gestione el field-manager cdi-operator.
+  # fragile schema pointers, we ignore by OWNER: everything the cdi-operator field-manager manages.
   ignoreDifferences:
     - group: apiextensions.k8s.io
       kind: CustomResourceDefinition

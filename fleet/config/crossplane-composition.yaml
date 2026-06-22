@@ -37,7 +37,7 @@ spec:
                     kind: Cluster
                     metadata:
                       namespace: fleet
-                      labels: { cni: calico }   # el ClusterResourceSet calico-cni matchea este label e inyecta el CNI
+                      labels: { cni: calico }   # the calico-cni ClusterResourceSet matches this label and injects the CNI
                     spec:
                       clusterNetwork:
                         pods: { cidrBlocks: ["10.243.0.0/16"] }
@@ -59,9 +59,9 @@ spec:
                 toFieldPath: spec.forProvider.manifest.spec.controlPlaneRef.name
                 transforms: [{ type: string, string: { type: Format, fmt: "%s-control-plane" } }]
               - { type: FromCompositeFieldPath, fromFieldPath: metadata.name, toFieldPath: spec.forProvider.manifest.spec.infrastructureRef.name }
-              - { type: FromCompositeFieldPath, fromFieldPath: spec.cni, toFieldPath: spec.forProvider.manifest.metadata.labels.cni }   # selecciona qué CRS de CNI inyecta (calico/cilium)
-              - { type: FromCompositeFieldPath, fromFieldPath: spec.role, toFieldPath: 'spec.forProvider.manifest.metadata.labels["platform.idp/role"]' }   # host|management → HelmChartProxy de ArgoCD matchea management
-              - { type: FromCompositeFieldPath, fromFieldPath: spec.region, toFieldPath: 'spec.forProvider.manifest.metadata.labels["platform.idp/region"]' }   # región → el HelmChartProxy siembra un region-root scopeado
+              - { type: FromCompositeFieldPath, fromFieldPath: spec.cni, toFieldPath: spec.forProvider.manifest.metadata.labels.cni }   # selects which CNI CRS is injected (calico/cilium)
+              - { type: FromCompositeFieldPath, fromFieldPath: spec.role, toFieldPath: 'spec.forProvider.manifest.metadata.labels["platform.idp/role"]' }   # host|management → the ArgoCD HelmChartProxy matches management
+              - { type: FromCompositeFieldPath, fromFieldPath: spec.region, toFieldPath: 'spec.forProvider.manifest.metadata.labels["platform.idp/region"]' }   # region → the HelmChartProxy seeds a scoped region-root
               - { type: ToCompositeFieldPath, fromFieldPath: spec.forProvider.manifest.metadata.name, toFieldPath: status.clusterName }
 
           - name: kubevirtcluster
@@ -156,10 +156,10 @@ spec:
                           virtualMachineTemplate:
                             spec:
                               runStrategy: Always
-                              # Disco de la VM = DataVolume (CDI importa la cloud-image a un PVC de
-                              # Longhorn). CAPK prefija el nombre por-máquina (prefixDataVolumeTemplates),
-                              # así no colisionan entre réplicas. Reemplaza el containerDisk efímero de
-                              # 10Gi que daba disk-pressure. Ver FLEET-HCI-STORAGE-NETWORKING.md.
+                              # VM disk = DataVolume (CDI imports the cloud image into a Longhorn
+                              # PVC). CAPK prefixes the name per machine (prefixDataVolumeTemplates),
+                              # so replicas don't collide. Replaces the ephemeral 10Gi containerDisk
+                              # that caused disk-pressure.
                               dataVolumeTemplates:
                                 - metadata: { name: boot-volume }
                                   spec:
@@ -172,7 +172,7 @@ spec:
                                         url: "docker://quay.io/capk/ubuntu-2404-container-disk:v1.31.5"
                               template:
                                 spec:
-                                  architecture: amd64   # patched from HostCluster spec.nodeArch (arch del VMI; KubeVirt defaultea a la del control-plane)
+                                  architecture: amd64   # patched from HostCluster spec.nodeArch (VMI arch; KubeVirt defaults to the control-plane's)
                                   evictionStrategy: External
                                   domain:
                                     cpu: { cores: 2 }
@@ -265,10 +265,10 @@ spec:
                           virtualMachineTemplate:
                             spec:
                               runStrategy: Always
-                              # Disco de la VM = DataVolume (CDI importa la cloud-image a un PVC de
-                              # Longhorn). CAPK prefija el nombre por-máquina (prefixDataVolumeTemplates),
-                              # así no colisionan entre réplicas. Reemplaza el containerDisk efímero de
-                              # 10Gi que daba disk-pressure. Ver FLEET-HCI-STORAGE-NETWORKING.md.
+                              # VM disk = DataVolume (CDI imports the cloud image into a Longhorn
+                              # PVC). CAPK prefixes the name per machine (prefixDataVolumeTemplates),
+                              # so replicas don't collide. Replaces the ephemeral 10Gi containerDisk
+                              # that caused disk-pressure.
                               dataVolumeTemplates:
                                 - metadata: { name: boot-volume }
                                   spec:
@@ -281,7 +281,7 @@ spec:
                                         url: "docker://quay.io/capk/ubuntu-2404-container-disk:v1.31.5"
                               template:
                                 spec:
-                                  architecture: amd64   # patched from HostCluster spec.nodeArch (arch del VMI; KubeVirt defaultea a la del control-plane)
+                                  architecture: amd64   # patched from HostCluster spec.nodeArch (VMI arch; KubeVirt defaults to the control-plane's)
                                   evictionStrategy: External
                                   domain:
                                     cpu: { cores: 2 }

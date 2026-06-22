@@ -1,7 +1,7 @@
-# Child app of platform-root: el wiring de "management child" — el HelmChartProxy que
-# instala ArgoCD en los clusters role=management (CAAPH lo aplica en el workload).
-# sync-wave 4 -> después de fleet-config (wave 3, que instala CAAPH vía AddonProvider) y
-# junto a fleet-cni; antes/junto a los HostCluster (wave 5).
+# Child app of platform-root: the "management" wiring — the HelmChartProxy that
+# installs ArgoCD on role=management clusters (CAAPH applies it in the workload).
+# sync-wave 4 -> after fleet-config (wave 3, which installs CAAPH via the AddonProvider) and
+# alongside fleet-cni; before/with the HostClusters (wave 5).
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -22,12 +22,12 @@ spec:
     automated: { prune: true, selfHeal: true }
     syncOptions:
       - ServerSideApply=true
-      - SkipDryRunOnMissingResource=true   # el CRD HelmChartProxy aparece cuando CAAPH instala
-      - RespectIgnoreDifferences=true      # selfHeal no revierte los campos ignorados (co-dueño CAAPH)
-  # OutOfSync benigno: CAAPH (el addon-provider) es co-dueño de spec.options del HelmChartProxy. Tras el
+      - SkipDryRunOnMissingResource=true   # the HelmChartProxy CRD appears once CAAPH installs
+      - RespectIgnoreDifferences=true      # selfHeal doesn't revert the ignored fields (co-owner CAAPH)
+  # Benign OutOfSync: CAAPH (the addon-provider) co-owns the HelmChartProxy's spec.options. After the
   # apply rellena sus defaults (enableClientCache:false, upgrade.maxHistory:10, reconcileStrategy) y
-  # normaliza el timeout (15m->15m0s). En Git sólo fijamos install.createNamespace/timeout/wait, así que
-  # esos defaults aparecen como diff aunque ambos HelmChartProxy estén Ready=True. Ignoramos spec.options.
+  # it normalizes the timeout (15m->15m0s). In Git we only set install.createNamespace/timeout/wait, so
+  # those defaults show up as a diff even though both HelmChartProxies are Ready=True. We ignore spec.options.
   ignoreDifferences:
     - group: addons.cluster.x-k8s.io
       kind: HelmChartProxy

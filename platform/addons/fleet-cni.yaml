@@ -1,7 +1,7 @@
 # Child app of platform-root: empaqueta el CNI (Calico) como ConfigMap + ClusterResourceSet
-# en el management. CAPI (vía el CRS) lo inyecta en cada workload cluster con label cni=calico
-# al nacer -> los nodos pasan de NotReady a Ready. sync-wave 4 -> después de fleet-config
-# (wave 3, que trae los Provider CRs/CRS CRD) y antes/junto a los HostCluster (wave 5).
+# on the management. CAPI (via the CRS) injects it into each workload cluster labeled cni=calico
+# when born -> nodes go from NotReady to Ready. sync-wave 4 -> after fleet-config
+# (wave 3, which brings the Provider CRs/CRS CRD) and before/with the HostClusters (wave 5).
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -21,4 +21,4 @@ spec:
   syncPolicy:
     automated: { prune: true, selfHeal: true }
     syncOptions:
-      - ServerSideApply=true     # el ConfigMap de Calico es grande; SSA evita el límite de last-applied annotation
+      - ServerSideApply=true     # the Calico ConfigMap is large; SSA avoids the last-applied annotation size limit

@@ -34,8 +34,8 @@ spec:
                 nodeImage:
                   type: string
                   default: "quay.io/capk/ubuntu-2404-container-disk:v1.31.5"
-                diskSize: { type: string, default: "30Gi" }     # disco de la VM = DataVolume sobre longhorn-vm. Thin-provisioned (techo, no reserva). 30Gi cómodo p/1-2 tenants; subir per-cluster si hay más.
-                cpInitTimeout: { type: string }                  # kubeadm wait-control-plane timeout (ej "10m0s"). SIN default a propósito: si no se setea, el patch Optional no toca el KCP → otros clusters NO rolean. Subir solo en clusters de boot lento (DataVolume) que tardan >4m.
+                diskSize: { type: string, default: "30Gi" }     # VM disk = DataVolume on longhorn-vm. Thin-provisioned (a ceiling, not a reservation). 30Gi is comfortable for 1-2 tenants; raise per-cluster if more.
+                cpInitTimeout: { type: string }                  # kubeadm wait-control-plane timeout (e.g. "10m0s"). NO default on purpose: if unset, the Optional patch does not touch the KCP → other clusters do NOT roll. Raise only on slow-boot clusters (DataVolume) that take >4m.
               required: [kubernetesVersion]
             status:
               type: object

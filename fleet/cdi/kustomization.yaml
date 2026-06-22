@@ -1,6 +1,6 @@
-# CDI (Containerized Data Importer) — importa la cloud-image de la VM a un PVC (Longhorn),
-# para que el disco de la VM sea un volumen de red (no el containerDisk efímero). Companion
-# de KubeVirt. v1.64.0 alineado con KubeVirt v1.8.0.
+# CDI (Containerized Data Importer) — imports the VM cloud image into a PVC (Longhorn),
+# so the VM disk is a network volume (not the ephemeral containerDisk). Companion
+# to KubeVirt. v1.64.0 aligned with KubeVirt v1.8.0.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
