@@ -84,6 +84,14 @@ clusters. When each fits:
 **Don't over-isolate** — go up one rung at a time, by the isolation you actually need. More in the vCluster
 docs: [architecture &amp; tenancy](https://www.vcluster.com/docs/vcluster/introduction/architecture).
 
+## The YAML that makes it work
+- [`vcluster/shared-nodes.yaml`](https://github.com/villadalmine/vcluster-idp/blob/main/vcluster/shared-nodes.yaml) — the vCluster values we chose (shared-nodes).
+- [`applicationsets/hosts-appset.yaml`](https://github.com/villadalmine/vcluster-idp/blob/main/applicationsets/hosts-appset.yaml) — generates the vCluster per tenant.
+- [`applicationsets/tenants-appset.yaml`](https://github.com/villadalmine/vcluster-idp/blob/main/applicationsets/tenants-appset.yaml) — deploys the workload chart INSIDE each vCluster.
+- [`applicationsets/routes-appset.yaml`](https://github.com/villadalmine/vcluster-idp/blob/main/applicationsets/routes-appset.yaml) — the host-side Gateway/HTTPRoute + TLS.
+- [`charts/tenant/`](https://github.com/villadalmine/vcluster-idp/tree/main/charts/tenant) — the tenant workload chart (ns, quota, netpol, Secret, Postgres, API, Web).
+- [`platform/vcluster-register/vcluster-register.yaml`](https://github.com/villadalmine/vcluster-idp/blob/main/platform/vcluster-register/vcluster-register.yaml) — the CronJob that registers each vCluster in ArgoCD.
+
 ---
 
 <sub>Manifests &amp; scripts:

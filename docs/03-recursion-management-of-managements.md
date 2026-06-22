@@ -49,6 +49,15 @@ a **management-of-managements**: a cluster that creates *and fully serves* its o
 another cluster's hypervisor) · `CAAPH` (installs ArgoCD *into* a cluster) · `ClusterResourceSet` (seeds CNI
 + region-root) · `Crossplane` (the `HostCluster` API) · decentralized `ArgoCD` per cluster.
 
+## The YAML that makes it work
+- [`clusters/homelab/host-mgmt.yaml`](https://github.com/villadalmine/vcluster-idp/blob/main/clusters/homelab/host-mgmt.yaml) — the `role=management` host cluster (Crossplane HostCluster).
+- [`clusters/management/mgmt-child-cluster.yaml`](https://github.com/villadalmine/vcluster-idp/blob/main/clusters/management/mgmt-child-cluster.yaml) — the child cluster host-mgmt creates (CAPK external-infra).
+- [`clusters/management/mgmt-child-addons.yaml`](https://github.com/villadalmine/vcluster-idp/blob/main/clusters/management/mgmt-child-addons.yaml) — the stack delivered to the child: ArgoCD + region-root + CNI.
+- [`clusters/management/mgmt-child-addons-crs.yaml`](https://github.com/villadalmine/vcluster-idp/blob/main/clusters/management/mgmt-child-addons-crs.yaml) — the ClusterResourceSet that seeds it.
+- [`clusters/management/helmchartproxy-capi.yaml`](https://github.com/villadalmine/vcluster-idp/blob/main/clusters/management/helmchartproxy-capi.yaml) — CAAPH installing Cluster API / ArgoCD into the management cluster.
+- [`clusters/cni/clusterresourceset-calico-vxlan.yaml`](https://github.com/villadalmine/vcluster-idp/blob/main/clusters/cni/clusterresourceset-calico-vxlan.yaml) — CNI bootstrap (egg-and-chicken).
+- [`fleet/config/crossplane-composition.yaml`](https://github.com/villadalmine/vcluster-idp/blob/main/fleet/config/crossplane-composition.yaml) — the HostCluster → CAPI/KubeVirt composition.
+
 ---
 
 <sub>Source:

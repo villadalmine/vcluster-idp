@@ -51,6 +51,12 @@ Same hardware, three isolated tenants, three local models, three stories.
 This is the pattern behind GPU-as-a-service for an internal platform: tenants get isolated, metered,
 quota-enforced slices of shared accelerators — without dedicating a whole card (or a whole node) to each.
 
+## The YAML that makes it work
+- [`bonus/ollama-gpu.yaml`](https://github.com/villadalmine/vcluster-idp/blob/main/bonus/ollama-gpu.yaml) — Ollama on 2 HAMi vGPU slices (+ PVC).
+- [`bonus/tenant-llm-2gpu.yaml`](https://github.com/villadalmine/vcluster-idp/blob/main/bonus/tenant-llm-2gpu.yaml) — the per-tenant LLM (2 vGPU, one slice per card).
+- [`bonus/gpu-greedy-pending.yaml`](https://github.com/villadalmine/vcluster-idp/blob/main/bonus/gpu-greedy-pending.yaml) — the over-budget request that stays Pending (guardrail).
+- [`bonus/tenant-gpu-pod.yaml`](https://github.com/villadalmine/vcluster-idp/blob/main/bonus/tenant-gpu-pod.yaml) — a tenant pod with a single capped slice.
+
 ---
 
 <sub>Manifests, scripts and the full write-up:
