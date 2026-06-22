@@ -1,0 +1,39 @@
+digraph G {
+  rankdir=TB; bgcolor="white"; pad=0.4; nodesep=0.5; ranksep=0.85;
+  fontname="Helvetica"; fontsize=20; labelloc=t;
+  label=<<b>Multi-tenant GPU on bare metal</b><br/>3 isolated vClusters sharing 2 physical GPUs via HAMi vGPU — each runs a local LLM (Ollama)>;
+  node [fontname="Helvetica", shape=box, style="rounded,filled", fontsize=12, margin="0.18,0.10"];
+  edge [fontname="Helvetica", fontsize=10, color="#555555"];
+
+  subgraph cluster_tenants {
+    label=<<b>Tenants — isolated vClusters (own API server + etcd)</b>>; labeljust=l;
+    style="rounded,dashed"; color="#90a4ae"; fontsize=13; margin=16;
+    ta [label=<<b>tenant-a</b> vCluster<br/>Ollama · llama3.2<br/><i>"love story"</i>>, fillcolor="#e3f2fd", color="#1976d2"];
+    tb [label=<<b>tenant-b</b> vCluster<br/>Ollama · llama3.2<br/><i>"heist"</i>>, fillcolor="#e8f5e9", color="#2e7d32"];
+    tc [label=<<b>tenant-c</b> vCluster<br/>Ollama · llama3.2<br/><i>"noir"</i>>, fillcolor="#fff3e0", color="#ef6c00"];
+  }
+
+  hami [label=<<b>HAMi vGPU</b>  (CNCF)<br/>software slicing — no MIG, no passthrough<br/>hard caps per pod: VRAM (gpumem) + cores (gpucores)<br/>each tenant = <b>2 vGPU</b> (one slice of EACH card, 2000 MiB)>,
+        fillcolor="#ede7f6", color="#5e35b1", shape=box, fontsize=12];
+
+  subgraph cluster_node {
+    label=<<b>srv-t7910 — bare-metal node (k3s Root cluster)</b>>; labeljust=l;
+    style="rounded,filled"; fillcolor="#fafafa"; color="#bdbdbd"; fontsize=13; margin=16;
+    p4 [label=<<b>Tesla P4</b><br/>7680 MiB>, fillcolor="#c8e6c9", color="#2e7d32"];
+    m4 [label=<<b>Quadro M4000</b><br/>8192 MiB>, fillcolor="#c8e6c9", color="#2e7d32"];
+  }
+
+  ta -> hami [color="#1976d2"];
+  tb -> hami [color="#2e7d32"];
+  tc -> hami [color="#ef6c00"];
+  hami -> p4 [label="vGPU slices", color="#5e35b1"];
+  hami -> m4 [label="vGPU slices", color="#5e35b1"];
+
+  legend [shape=note, fillcolor="#fffde7", color="#fbc02d", fontsize=11, label=<
+    <b>Stack</b>  (bottom → top)<br align="left"/>
+    bare-metal GPUs  →  HAMi (vGPU slicing)  →  vCluster (tenant isolation)  →  Ollama (local LLM)<br align="left"/>
+    Governance: per-tenant hard VRAM/core caps · over-budget = Pending · live metrics (Prometheus)<br align="left"/>
+  >];
+  { rank=same; hami; legend; }
+  hami -> legend [style=invis];
+}

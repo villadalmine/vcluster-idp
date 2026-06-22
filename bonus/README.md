@@ -37,3 +37,20 @@ vcluster connect vcluster-tenant-a-dev -n vcluster-tenant-a-dev -- kubectl apply
 kubectl apply -f bonus/gpu-greedy-pending.yaml      # the Pending guardrail demo
 bash bonus/gpu-demo.sh                               # the narrated walkthrough
 ```
+
+---
+
+## Scenario 2 — 3 tenants, 2 GPUs, 3 stories (the cinematic)
+
+![Architecture](./gpu-architecture.png)
+
+Three tenants (`tenant-a/b/c`), each an **Ollama LLM inside its own vCluster** with **2 vGPU (one slice of
+EACH physical card)**. HAMi hard-caps and isolates them, so the three share the same 2 bare-metal GPUs at
+once. Each pod loads `llama3.2:1b` **across both cards** (`OLLAMA_SCHED_SPREAD=1`) and tells a different
+Kubernetes story — a love story, a heist, and a noir mystery. It demonstrates **local LLMs + GPU
+multi-tenancy + per-tenant isolation** end to end.
+
+**Files:** [`tenant-llm-2gpu.yaml`](./tenant-llm-2gpu.yaml) (the per-tenant 2-vGPU Ollama),
+[`gpu-3tenant.sh`](./gpu-3tenant.sh) (the cinematic), [`demo-3tenant-gpu.cast`](./demo-3tenant-gpu.cast)
+(recording), [`gpu-architecture.dot`](./gpu-architecture.dot) / [`gpu-architecture.png`](./gpu-architecture.png)
+(the diagram above).

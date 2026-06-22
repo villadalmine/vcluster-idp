@@ -1,0 +1,34 @@
+# BONUS — a per-tenant LLM (Ollama) spanning BOTH physical GPUs.
+# Apply INSIDE each tenant's vCluster (one per tenant: tenant-a / tenant-b / tenant-c), e.g.:
+#   for t in a b c; do
+#     vcluster connect vcluster-tenant-$t-dev -n vcluster-tenant-$t-dev -- \
+#       kubectl apply -n tenant-$t -f bonus/tenant-llm-2gpu.yaml
+#   done
+# HAMi gives the pod 2 vGPU (one slice of EACH physical card); OLLAMA_SCHED_SPREAD=1 makes Ollama load the
+# model across both. The three tenants share the same 2 bare-metal GPUs, each hard-capped + isolated.
+# Egress is allowed (the tenant NetworkPolicy is default-deny INGRESS only), so the pod can pull the model.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tenant-llm
+  # namespace: tenant-a   # set to the tenant's namespace inside its vCluster
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: tenant-llm } }
+  template:
+    metadata: { labels: { app: tenant-llm } }
+    spec:
+      containers:
+        - name: ollama
+          image: ollama/ollama:latest
+          env:
+            - { name: OLLAMA_SCHED_SPREAD, value: "1" }   # spread the model across both assigned GPUs
+          resources:
+            requests: { cpu: "300m", memory: 1Gi }
+            limits:
+              cpu: "2"
+              memory: 4Gi
+              nvidia.com/gpu: "2"        # TWO vGPU — one slice per physical card
+              nvidia.com/gpumem: "2000"  # HARD cap PER device: 2000 MiB
+              nvidia.com/gpucores: "20"  # HARD cap PER device: 20% compute
+# Then: kubectl -n tenant-<t> exec deploy/tenant-llm -- ollama pull llama3.2:1b

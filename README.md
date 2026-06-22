@@ -176,6 +176,14 @@ Real, live terminal recordings (asciinema) — click to play:
       </a>
     </td>
   </tr>
+  <tr>
+    <td align="center" width="25%">
+      <b>9. Bonus: 3 tenants &middot; 2 GPUs &middot; 3 stories</b><br/>
+      <a href="https://asciinema.org/a/eaoQKFsHhVDQ7qXc" target="_blank">
+        <img src="https://asciinema.org/img/play-button.png" width="80" alt="3 tenants 2 GPUs 3 stories"/>
+      </a>
+    </td>
+  </tr>
 </table>
 
 What each recording shows (one line each):
@@ -187,6 +195,11 @@ What each recording shows (one line each):
 6. **Fleet Inspection** — `cli/showcase-fleet`: reaching the created host clusters via jump pods (VM->node placement, per-layer health, each cluster's ArgoCD + vClusters).
 7. **vClusters Detail** — `cli/fleet-test vc-info`: a rich card per vCluster across the fleet — Git source + domain, its ArgoCD apps, what runs in it, what it exposes (HTTPRoute), and how to operate it (kubeconfig).
 8. **Bonus: Multi-tenant GPU (HAMi)** — bare-metal GPUs sliced with hard VRAM/compute caps: per-tenant GPU budget + live metrics, a tenant's capped slice inside its vCluster, an over-budget request kept **Pending** (guardrail), one pod spanning **both** cards, and a live Ollama LLM. Not an IDP requirement — see [`bonus/`](./bonus/).
+9. **Bonus: 3 tenants &middot; 2 GPUs &middot; 3 stories** — `tenant-a/b/c` each run a local LLM (Ollama) inside their own vCluster, each spanning **both** physical GPUs (HAMi 2-vGPU), and each tells a different Kubernetes story (love / heist / noir). Architecture below; see [`bonus/`](./bonus/).
+
+<p align="center">
+  <img src="./bonus/gpu-architecture.png" alt="Multi-tenant GPU: 3 vClusters sharing 2 bare-metal GPUs via HAMi vGPU, each running a local LLM" width="900"/>
+</p>
 
 ### 📄 Full Read-Only Validation Output (Text Version)
 If the terminal recording scrolls too quickly, you can expand these sections to read the exact text output:
