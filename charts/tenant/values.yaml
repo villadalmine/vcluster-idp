@@ -55,7 +55,11 @@ postgres:
 #             works through vCluster sync.toHost.gatewayApi (Cilium on this homelab).
 # TLS terminates at L7 (Ingress or Gateway) via cert-manager — never on a raw L4 LB.
 externalAccess:
-  mode: ingress
+  # gateway (default): external routing is created HOST-SIDE by charts/tenant-route (Gateway API +
+  #   persona split); the chart's own gateway.yaml is an intentional empty stub. This is the live,
+  #   documented path and the platform's ApplicationSets set it explicitly.
+  # ingress: portable fallback (renders templates/ingress.yaml) for a cluster without Gateway API.
+  mode: gateway
   tls:
     enabled: true
     clusterIssuer: cluster-home-ca-issuer   # cert-manager ClusterIssuer (CA-backed)

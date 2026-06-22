@@ -708,7 +708,8 @@ cluster down at once. That is a real **single point of failure**, and it is wort
 *   **ESO Option**: Opt-in via [`eso-appset.yaml`](./applicationsets/eso-appset.yaml) to generate keys in-cluster without storing sensitive material in Git.
 
 ### External Access & TLS (Req 12)
-*   Gateway and HTTPRoute definitions terminate TLS on the host in [`routes-appset.yaml`](./applicationsets/routes-appset.yaml), targeting the virtual services. TLS certs are issued by cert-manager gateway-shim.
+*   Gateway and HTTPRoute definitions terminate TLS on the host in [`routes-appset.yaml`](./applicationsets/routes-appset.yaml) (rendering [`charts/tenant-route/`](./charts/tenant-route/)), targeting the vCluster-synced services. TLS certs are issued by cert-manager gateway-shim.
+*   The tenant chart's `externalAccess.mode` defaults to **`gateway`** — routing is created host-side via `charts/tenant-route` (the persona split; the chart's own [`gateway.yaml`](./charts/tenant/templates/gateway.yaml) is an intentional empty stub because vCluster doesn't sync Gateway-API objects to the host, only Services). An **`ingress`** mode ([`ingress.yaml`](./charts/tenant/templates/ingress.yaml)) is kept as a **portable fallback** for clusters without Gateway API.
 
 ### Kubernetes Access (Req 13)
 *   **Applications** — reached over their external domains via the host Gateway/HTTPRoute (`api.<tenant>.<domain>`, `web.<tenant>.<domain>`); see External Access above.
