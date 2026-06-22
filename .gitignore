@@ -24,3 +24,7 @@ overview-simplified.svg
 
 # Scratch recording (dup of showcase-platform) — kept locally, not shipped
 full-read-test.cast
+
+# GitHub Pages blog (docs/) — DO publish these markdown files
+!docs/*.md
+!docs/**/*.md
