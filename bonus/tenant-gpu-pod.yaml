@@ -1,0 +1,24 @@
+# BONUS — a TENANT pod requesting a HAMi vGPU slice, applied INSIDE a tenant's vCluster.
+# Run it against the vCluster (not the host), e.g.:
+#   vcluster connect vcluster-tenant-a-dev -n vcluster-tenant-a-dev -- kubectl apply -f bonus/tenant-gpu-pod.yaml
+# vCluster syncs the pod to the host; HAMi's webhook + scheduler place it on the GPU node and enforce the
+# slice. `nvidia-smi` inside the pod then sees ONLY 1500MiB of the 8 GB card — hard per-tenant isolation.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: tenant-gpu-smi
+  namespace: tenant-a       # the tenant's namespace inside its vCluster
+spec:
+  restartPolicy: Never
+  containers:
+    - name: smi
+      image: nvidia/cuda:12.4.1-base-ubuntu22.04
+      command: ["sh", "-c", "nvidia-smi; sleep 1800"]
+      resources:
+        requests: { cpu: "100m", memory: 128Mi }
+        limits:
+          cpu: "500m"
+          memory: 512Mi
+          nvidia.com/gpu: "1"
+          nvidia.com/gpumem: "1500"   # HARD cap: this tenant sees only 1500 MiB
+          nvidia.com/gpucores: "15"

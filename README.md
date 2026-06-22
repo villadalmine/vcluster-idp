@@ -169,6 +169,12 @@ Real, live terminal recordings (asciinema) — click to play:
         <img src="https://asciinema.org/img/play-button.png" width="80" alt="vClusters Detail"/>
       </a>
     </td>
+    <td align="center" width="25%">
+      <b>8. Bonus: Multi-tenant GPU (HAMi)</b><br/>
+      <a href="https://asciinema.org/a/bZsUVCSnLQCgWLVn" target="_blank">
+        <img src="https://asciinema.org/img/play-button.png" width="80" alt="Multi-tenant GPU (HAMi vGPU)"/>
+      </a>
+    </td>
   </tr>
 </table>
 
@@ -180,6 +186,7 @@ What each recording shows (one line each):
 5. **Topology & Hierarchy** — `cli/showcase-topology`: the topology models live, including the recursion (`host-mgmt -> mgmt-child`).
 6. **Fleet Inspection** — `cli/showcase-fleet`: reaching the created host clusters via jump pods (VM->node placement, per-layer health, each cluster's ArgoCD + vClusters).
 7. **vClusters Detail** — `cli/fleet-test vc-info`: a rich card per vCluster across the fleet — Git source + domain, its ArgoCD apps, what runs in it, what it exposes (HTTPRoute), and how to operate it (kubeconfig).
+8. **Bonus: Multi-tenant GPU (HAMi)** — a tenant pod inside its vCluster gets a HAMi-sliced vGPU (hard-capped VRAM), and an Ollama LLM answers a prompt live on the GPU. Not an IDP requirement — see [`bonus/`](./bonus/).
 
 ### 📄 Full Read-Only Validation Output (Text Version)
 If the terminal recording scrolls too quickly, you can expand these sections to read the exact text output:
