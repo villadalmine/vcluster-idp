@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# ═══════════════════════════════════════════════════════════════════════════
+# showcase-fleet — narrated, read-only walkthrough of how to INSPECT the created
+# host clusters with cli/fleet-test.
+#
+# The host clusters are KubeVirt VMs whose API is a ClusterIP (only routable from
+# the management's pod network), so fleet-test reaches each one through a jump pod
+# using its kubeconfig. Everything below is queried LIVE — no hardcoded output.
+# Mirrors README §2.3 (recordings) and the cli/fleet-test tool.
+# ═══════════════════════════════════════════════════════════════════════════
+set -uo pipefail
+
+c_reset="\033[0m"; c_bold="\033[1m"; c_cyan="\033[36m"; c_yellow="\033[33m"; c_dim="\033[2m"
+sec() {
+  echo
+  echo -e "${c_cyan}${c_bold}═══════════════════════════════════════════════════════════════════════════${c_reset}"
+  echo -e " ${c_bold}$1${c_reset}"
+  echo -e "${c_cyan}${c_bold}═══════════════════════════════════════════════════════════════════════════${c_reset}"
+  echo -e " ${c_yellow}ℹ️${c_reset}  $2"
+  echo
+  sleep 2
+}
+run() { echo -e "${c_dim}\$${c_reset} ${c_bold}$*${c_reset}"; sleep 1.2; "$@"; sleep 2; }
+
+FT="./cli/fleet-test"
+
+echo -e "${c_bold}Fleet inspection with cli/fleet-test — read-only, live${c_reset}"
+echo -e "${c_dim}Created host clusters are reached through a jump pod (their API is a ClusterIP).${c_reset}"
+sleep 2
+
+sec "1. WHERE the VMs run (KubeVirt → real node)" \
+    "Every host-cluster node is a KubeVirt VM. Map each guest node to its real bare-metal node."
+run $FT vms
+
+sec "2. CHECK a regional host cluster (host-euw1)" \
+    "Per-layer health via a jump pod: CAPI, nodes (+ their hypervisor node), CNI, cross-node DNS, StorageClasses, its OWN ArgoCD apps, and the tenant vClusters it hosts."
+run $FT check host-euw1
+
+sec "3. CHECK the recursive rung (mgmt-child)" \
+    "host-mgmt created mgmt-child and handed it the same stack. It is NOT a Root-managed Cluster — reached only via its kubeconfig (CAPI shows n/a, on purpose)."
+run $FT check mgmt-child
+
+sec "4. ALL vClusters across the fleet" \
+    "Every tenant control plane, on every host cluster that actually hosts one (regional + recursive)."
+run $FT vclusters
+
+echo
+echo -e "${c_bold}Done — clusters discovered dynamically, every line queried live.${c_reset}"
+sleep 1

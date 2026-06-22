@@ -1,8 +1,8 @@
-# HelmChartProxy (CAAPH) — instala ArgoCD DENTRO de cada cluster con label
+# HelmChartProxy (CAAPH) — installs ArgoCD INTO each cluster labeled
 # platform.idp/role=management, usando Helm. Es la forma CAPI-nativa de instalar un addon
-# pesado en un workload (sin el límite de tamaño de un ConfigMap/CRS). CAAPH corre en el
-# management, espera a que el cluster esté listo, y aplica el chart vía su kubeconfig.
-# Así un "host cluster" se vuelve "management" (primer escalón: ya tiene su motor GitOps).
+# heavy addon into a workload (no ConfigMap/CRS size limit). CAAPH runs on the
+# management, waits for the cluster to be ready, and applies the chart via its kubeconfig.
+# This is how a "host cluster" becomes "management" (first rung: it now has its GitOps engine).
 apiVersion: addons.cluster.x-k8s.io/v1alpha1
 kind: HelmChartProxy
 metadata:
@@ -10,36 +10,36 @@ metadata:
   namespace: fleet
 spec:
   clusterSelector:
-    # ArgoCD se instala en los management (corren CAPI + se autogestionan) Y en los regional (workload
-    # clusters que hospedan sus propios tenants con GitOps descentralizado). NUNCA pone tenants en un
-    # management: un management CREA el workload que hospeda los vClusters (ver MODELO-CANONICO.md).
+    # ArgoCD is installed on the management clusters (they run CAPI + self-manage) AND on the regional (workload
+    # clusters that host their own tenants with decentralized GitOps). It NEVER places tenants on a
+    # management: a management CREATES the workload that hosts the vClusters (see the canonical model).
     matchExpressions:
       - { key: platform.idp/role, operator: In, values: [management, regional] }
   repoURL: https://argoproj.github.io/argo-helm
   chartName: argo-cd
-  # version: 7.8.2          # pinear para reproducibilidad; sin pin, CAAPH instala el último
+  # version: 7.8.2          # pin for reproducibility; without a pin, CAAPH installs the latest
   releaseName: argocd
   namespace: argocd
   options:
     install:
       createNamespace: true
-  # Sólo instala ArgoCD. El "region-root" (app-of-apps por región) NO se siembra acá:
-  # el chart instala el CRD Application y un extraObjects que lo referencia falla en el build
-  # de helm ("ensure CRDs are installed first" — el CRD aún no está registrado). Por eso el
-  # region-root lo siembra un ClusterResourceSet (region-root-crs.yaml), que reintenta hasta que
-  # el CRD exista. Desacopla el seed del timing del helm install.
+  # Installs ArgoCD only. The "region-root" (per-region app-of-apps) is NOT seeded here:
+  # the chart installs the Application CRD and an extraObjects that references it fails the helm
+  # build ("ensure CRDs are installed first" — the CRD is not registered yet). So the
+  # region-root is seeded by a ClusterResourceSet (region-root-crs.yaml), which retries until
+  # the CRD exists. Decouples the seed from the helm-install timing.
   valuesTemplate: |
     crds:
       install: true
     configs:
       params:
-        server.insecure: true   # homelab; detrás de un Gateway/ingress con TLS en prod
+        server.insecure: true   # homelab; behind a Gateway/ingress with TLS in prod
       cm:
-        # Health-check custom para ClusterResourceSet. El default de ArgoCD marca Progressing si el CRS
-        # no tiene la condición ResourcesApplied=True — pero un CRS que NO matchea ningún cluster (un CNI
-        # alternativo declarado como opción, ej. calico-IPIP/cilium cuando el hijo usa calico-vxlan) nunca
-        # la obtiene, y quedaba arrastrando la app child-cni a Progressing para siempre. Acá: Healthy si
-        # aplicó O si no matchea (idle), y Degraded SÓLO ante un fallo real (ResourcesApplied=False).
+        # Custom health-check for ClusterResourceSet. ArgoCD's default marks Progressing if the CRS
+        # lacks the ResourcesApplied=True condition — but a CRS that matches NO cluster (an alternative
+        # CNI declared as an option, e.g. calico-IPIP/cilium when the child uses calico-vxlan) never
+        # gets it, and it dragged the child-cni app to Progressing forever. Here: Healthy if it
+        # applied OR if it matches nothing (idle), and Degraded ONLY on a real failure (ResourcesApplied=False).
         "resource.customizations.health.addons.cluster.x-k8s.io_ClusterResourceSet": |
           hs = { status = "Healthy", message = "No matching clusters (unused CRS) — idle" }
           if obj.status ~= nil and obj.status.conditions ~= nil then
