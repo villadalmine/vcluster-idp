@@ -11,3 +11,13 @@ charts/tenant/Chart.lock
 # To include a specific one: git add -f <file>.md  (or drop this rule).
 *.md
 !README.md
+
+# Orphan diagrams — kept locally, NOT shipped (not referenced in README)
+architecture-ideal-vs-homelab.svg
+architecture.mermaid
+flow-deploy.mermaid
+flow-management-of-managements.mermaid
+flow-management-of-managements.svg
+flow-real-openstack.svg
+helm-vs-crossplane.svg
+overview-simplified.svg
