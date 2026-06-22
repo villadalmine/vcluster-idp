@@ -37,7 +37,7 @@ spec:
                     kind: Cluster
                     metadata:
                       namespace: fleet
-                      labels: { cni: calico }   # the calico-cni ClusterResourceSet matches this label and injects the CNI
+                      labels: { cni: calico-vxlan }   # base label, overridden by the spec.cni patch below; calico-vxlan = converged default
                     spec:
                       clusterNetwork:
                         pods: { cidrBlocks: ["10.243.0.0/16"] }

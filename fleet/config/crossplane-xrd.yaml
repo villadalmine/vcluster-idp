@@ -28,7 +28,7 @@ spec:
                 memory: { type: string, default: "4Gi" }
                 vmNodeHostname: { type: string, default: "srv-t7910" }
                 nodeArch: { type: string, default: "amd64" }   # VMI architecture; must match the pinned node's kubernetes.io/arch (KubeVirt won't infer it)
-                cni: { type: string, default: "calico" }        # which CNI the ClusterResourceSet injects: "calico" (dev) or "cilium" (acc/prod)
+                cni: { type: string, default: "calico-vxlan" }  # CNI the ClusterResourceSet injects: calico-vxlan (converged default for nested KubeVirt) | calico (IPIP) | cilium
                 role: { type: string, default: "host" }          # "host" (plain workload) or "management" (CAAPH HelmChartProxy installs ArgoCD into it)
                 region: { type: string, default: "" }            # when set + role=management, the seeded ArgoCD gets a region-root pointing at clusters/regions/<region>/apps
                 nodeImage:
