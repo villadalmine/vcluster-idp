@@ -232,5 +232,5 @@ fi
 
 # ── Resumen ─────────────────────────────────────────────────────────────────
 echo
-echo "Resultado: $(g "$PASS PASS")  /  $(r "$FAIL FAIL")  /  $(y "$SKIP SKIP")"
+echo "Result: $(g "$PASS PASS")  /  $(r "$FAIL FAIL")  /  $(y "$SKIP SKIP")"
 [ "$FAIL" -eq 0 ]
