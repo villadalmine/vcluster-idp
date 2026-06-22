@@ -1,9 +1,9 @@
-# ArgoCD (path clusters/cni) renderiza esto con kustomize:
-#   - el ClusterResourceSet
-#   - un ConfigMap `calico-cni` cuyo contenido ES el manifest de Calico (calico.yaml)
-# calico.yaml NO se aplica directo (kustomize lo consume como dato del generator), así que
-# Calico NO se instala en el management — sólo queda empaquetado para que el CRS lo inyecte
-# en el workload. Todo en el namespace `fleet` (donde viven los Cluster de CAPI).
+# ArgoCD (path clusters/cni) renders this with kustomize:
+#   - the ClusterResourceSet
+#   - a ConfigMap `calico-cni` whose content IS the Calico manifest (calico.yaml)
+# calico.yaml is NOT applied directly (kustomize consumes it as generator data), so
+# Calico is NOT installed on the management — it's just packaged for the CRS to inject
+# into the workload. All in the `fleet` namespace (where the CAPI Clusters live).
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: fleet
@@ -22,4 +22,4 @@ configMapGenerator:
     files:
       - cilium.yaml
 generatorOptions:
-  disableNameSuffixHash: true   # los CRS referencian los ConfigMap por nombre exacto (calico-cni / cilium-cni)
+  disableNameSuffixHash: true   # the CRSs reference the ConfigMaps by their exact name (calico-cni / cilium-cni)

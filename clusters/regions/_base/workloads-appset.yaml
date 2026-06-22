@@ -1,11 +1,11 @@
-# BASE COMPARTIDA (parametrizable). El overlay parchea REGION → <region> en metadata.name,
-# el path del generador y el label platform.idp/region. Ver clusters/regions/README.md
+# SHARED BASE (parametrizable). The overlay patches REGION → <region> in metadata.name,
+# the generator path and the platform.idp/region label. See clusters/regions/README.md
 #
-# Deploya el workload del tenant (ns·quota·netpol·secret·pg·api·web) DENTRO de su vCluster, en
-# el cluster regional. Espejo de applicationsets/tenants-appset.yaml pero scopeado a la región y
-# corriendo en el ArgoCD del regional. El destino `name: vcluster-<t>-<env>` es el cluster que
-# registra el CronJob vcluster-register. Hasta que el registro exista, esta App queda en error
-# (destino desconocido) y reintenta — consistencia eventual.
+# Deploys the tenant workload (ns·quota·netpol·secret·pg·api·web) INSIDE its vCluster, on
+# the regional cluster. Mirror of applicationsets/tenants-appset.yaml but scoped to the region and
+# running in the regional's ArgoCD. The destination `name: vcluster-<t>-<env>` is the cluster that
+# the vcluster-register CronJob registers. Until the registration exists, this App stays in error
+# (unknown destination) and retries — eventual consistency.
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
@@ -24,11 +24,11 @@ spec:
   template:
     metadata:
       name: "wl-{{.tenant.name}}-{{.tenant.environment}}"
-      # Intento de delete NO-cascading: el workload corre DENTRO del vCluster, así que al borrar el tenant
-      # el vcluster-app borra el vCluster y con él el workload — el finalizer del wl-app colgaría contra el
-      # vCluster ya borrado (destino muerto). NOTA: el appset-controller IGNORA este finalizers:[] y fuerza
-      # igual el resources-finalizer; por eso el safety-net real es el GC del CronJob vcluster-register, que
-      # destraba los wl-apps colgados (saca el finalizer cuando el destino ya no está registrado). Ver ADR-13.
+      # Attempted NON-cascading delete: the workload runs INSIDE the vCluster, so on tenant delete
+      # the vcluster-app deletes the vCluster and the workload with it — the wl-app finalizer would hang against the
+      # already-deleted vCluster (dead destination). NOTE: the appset-controller IGNORES this finalizers:[] and forces
+      # the resources-finalizer anyway; so the real safety-net is the vcluster-register CronJob's GC, which
+      # unsticks the hung wl-apps (removes the finalizer when the destination is no longer registered). See ADR-13.
       finalizers: []
       labels:
         platform.idp/tenant: "{{.tenant.name}}"
@@ -43,9 +43,9 @@ spec:
         path: charts/tenant
         helm:
           valuesObject:
-            # El tenant corre DENTRO del vCluster del cluster regional (nodos host-<region>-*), NO en
-            # el management. El default del chart pinea a srv-t7910 (test GPU) → acá los pods quedarían
-            # Pending. Liberamos el scheduler para la región (scoped, no toca el chart ni los tenants mgmt).
+            # The tenant runs INSIDE the regional cluster's vCluster (nodes host-<region>-*), NOT on
+            # the management. The chart default pins to srv-t7910 (GPU test) → here the pods would be
+            # Pending. We free the scheduler for the region (scoped, doesn't touch the chart or the mgmt tenants).
             placement:
               nodeSelector: {}
             externalAccess:
@@ -62,7 +62,7 @@ spec:
               web:
                 version: "{{.applications.web.version}}"
       destination:
-        name: "vcluster-{{.tenant.name}}-{{.tenant.environment}}"   # el cluster que registra el CronJob
+        name: "vcluster-{{.tenant.name}}-{{.tenant.environment}}"   # the cluster the CronJob registers
         namespace: "{{.tenant.name}}"
       ignoreDifferences:
         - kind: Secret

@@ -1,15 +1,15 @@
-# BASE COMPARTIDA (parametrizable por región). El overlay de cada región
-# (clusters/regions/<region>/apps/kustomization.yaml) parchea el token REGION → <region> en:
+# SHARED BASE (parametrizable per region). Each region's overlay
+# (region-root, see region-root-eu-west1.yaml) patches the REGION token → <region> in:
 #   - metadata.name        (vclusters-<region>)
-#   - el path del generador (clusters/regions/<region>/tenants/**/*.yaml)
-#   - el label platform.idp/region
-# Así agregar una región = 1 overlay chico, sin duplicar este appset. Ver clusters/regions/README.md
+#   - the generator path (clusters/regions/<region>/tenants/**/*.yaml)
+#   - the platform.idp/region label
+# So adding a region = 1 small overlay, without duplicating this appset. See clusters/regions/README.md
 #
-# ApplicationSet que corre en el ArgoCD del CLUSTER REGIONAL (sembrado por el region-root del
-# HelmChartProxy). Lee los tenants de ESTA región y provisiona un vCluster por tenant EN ESTE
-# cluster (destination = kubernetes.default.svc = el regional). Es el mismo patrón que
-# applicationsets/hosts-appset.yaml del management, pero scopeado a la región y corriendo en el
-# ArgoCD del regional. Así el management no deploya tenants: cada cluster regional despliega los suyos.
+# ApplicationSet running in the REGIONAL CLUSTER's ArgoCD (seeded by the region-root from the
+# HelmChartProxy). Reads THIS region's tenants and provisions one vCluster per tenant IN THIS
+# cluster (destination = kubernetes.default.svc = the regional). Same pattern as
+# applicationsets/hosts-appset.yaml on the management, but scoped to the region and running in the
+# regional's ArgoCD. So the management deploys no tenants: each regional cluster deploys its own.
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
@@ -40,9 +40,9 @@ spec:
         chart: vcluster
         targetRevision: "0.35.0"
         helm:
-          releaseName: "vcluster-{{.tenant.name}}-{{.tenant.environment}}"   # release==ns==svc → server https://<vc>.<ns>:443 (lo que espera el registro)
+          releaseName: "vcluster-{{.tenant.name}}-{{.tenant.environment}}"   # release==ns==svc → server https://<vc>.<ns>:443 (what the registration expects)
       destination:
-        server: https://kubernetes.default.svc          # el propio cluster regional
+        server: https://kubernetes.default.svc          # the regional cluster itself
         namespace: "vcluster-{{.tenant.name}}-{{.tenant.environment}}"
       syncPolicy:
         automated: { prune: true, selfHeal: true }

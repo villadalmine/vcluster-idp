@@ -1,6 +1,6 @@
-# Cluster REGIONAL eu-west1 (dev). role=management → CAAPH le instala su PROPIO ArgoCD; con
-# region=eu-west1 ese ArgoCD nace con un region-root → clusters/regions/eu-west1/apps →
-# provisiona los vCluster de los tenants de la región EN ESTE cluster (modelo descentralizado).
+# REGIONAL cluster eu-west1 (dev). role=regional → CAAPH installs its OWN ArgoCD; with
+# region=eu-west1 that ArgoCD is seeded with a region-root → clusters/regions/eu-west1 →
+# provisions the region's tenant vClusters IN THIS cluster (decentralized model).
 # CNI = Calico (Cilium no rutea ClusterIP/DNS en KubeVirt anidado — ver INCIDENTES §9).
 # OJO: al pushear se crean VMs reales (1 CP + 1 worker) en t7910.
 apiVersion: fleet.homelab.io/v1alpha1
@@ -26,7 +26,7 @@ spec:
   cni: calico-vxlan
   role: regional
   region: eu-west1
-  # Boot lento: la VM de euw1 arranca de un DataVolume (Longhorn) sobre KubeVirt anidado y su
-  # control-plane tarda >4m en levantar. Sin esto, kubeadm hace timeout a los 4m en wait-control-plane
-  # y el init no completa upload-config/mark-control-plane/addons → CAPI queda en WaitingForKubeadmInit.
+  # Slow boot: the euw1 VM boots from a DataVolume (Longhorn) on nested KubeVirt and its
+  # control-plane takes >4m to come up. Without this, kubeadm times out at 4m in wait-control-plane
+  # and init never completes upload-config/mark-control-plane/addons → CAPI stays in WaitingForKubeadmInit.
   cpInitTimeout: "15m0s"

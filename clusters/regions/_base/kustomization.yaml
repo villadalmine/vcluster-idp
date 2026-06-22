@@ -1,10 +1,10 @@
-# Base COMPARTIDA de los apps de una región (la corre el ArgoCD de CADA cluster regional, sembrada
-# por el region-root). vcluster-register y local-path-storage son region-agnostic; los dos appsets
-# llevan el token REGION que el overlay de cada región reemplaza. Ver clusters/regions/README.md
+# SHARED base of a region's apps (run by EACH regional cluster's ArgoCD, seeded
+# by the region-root). vcluster-register and local-path-storage are region-agnostic; the two appsets
+# carry the REGION token that each region's overlay replaces. See clusters/regions/README.md
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-  - vclusters-appset.yaml      # provisiona un vCluster por tenant de la región
-  - workloads-appset.yaml      # mete charts/tenant DENTRO de cada vCluster
-  - vcluster-register.yaml     # registra los vClusters como clusters de ArgoCD (region-agnostic)
-  - local-path-storage.yaml    # storage local para los vClusters (region-agnostic)
+  - vclusters-appset.yaml      # provisions one vCluster per tenant in the region
+  - workloads-appset.yaml      # deploys charts/tenant INSIDE each vCluster
+  - vcluster-register.yaml     # registers the vClusters as ArgoCD clusters (region-agnostic)
+  - local-path-storage.yaml    # local storage for the vClusters (region-agnostic)

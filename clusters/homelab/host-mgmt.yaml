@@ -1,7 +1,7 @@
-# Host cluster host-mgmt → management-child (region eu-central1). Rebuild con calico-vxlan.
-# Antes era cilium: el worker nunca joineó (NotReady) y el único CP queda con taint → el ArgoCD que
-# instala CAAPH no podía schedular (redis-init Pending 25h). VXLAN arregla el join cross-VM. Demuestra
-# el modelo "management-child": un host promovido a management con su PROPIO ArgoCD + region-root.
+# Host cluster host-mgmt → management role (creates its own child). Built with calico-vxlan.
+# It was cilium before: the worker never joined (NotReady) and the single CP kept its taint → the ArgoCD
+# CAAPH installs couldn't schedule (redis-init Pending 25h). VXLAN fixes the cross-VM join. Demonstrates
+# the "management-of-managements": a host promoted to management that creates + serves its own child.
 apiVersion: fleet.homelab.io/v1alpha1
 kind: HostCluster
 metadata:

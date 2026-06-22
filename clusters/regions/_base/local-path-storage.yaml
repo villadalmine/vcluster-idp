@@ -117,7 +117,7 @@ kind: StorageClass
 metadata:
   name: local-path
   annotations:
-    storageclass.kubernetes.io/is-default-class: "true"   # el PVC del vCluster no especifica clase → debe ser default
+    storageclass.kubernetes.io/is-default-class: "true"   # the vCluster PVC specifies no class → must be default
 provisioner: rancher.io/local-path
 volumeBindingMode: WaitForFirstConsumer
 reclaimPolicy: Delete

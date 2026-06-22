@@ -1,17 +1,17 @@
-# MachineHealthCheck (CAPI) — remediación AUTOMÁTICA de Machines no-sanas, en vez de borrar
-# virt-launchers a mano cuando una VM/nodo muere. Lo lee fleet-hostclusters (directorio clusters/homelab).
+# MachineHealthCheck (CAPI) — AUTOMATIC remediation of unhealthy Machines, instead of deleting
+# virt-launchers by hand when a VM/node dies. Read by fleet-hostclusters (directory clusters/homelab).
 #
-# DISEÑO (deliberado para este homelab anidado, ver README §3.1 y FALLO-NODO-RUNBOOK.md):
-#  - SCOPED A WORKERS (matchExpression control-plane DoesNotExist). NO remediamos el control-plane
-#    automáticamente: recrear un CP a mitad de un flap puede dejar un controlPlaneEndpoint inmutable
-#    stale (incidente ya vivido) — el KubeadmControlPlane tiene su propia remediación más cuidadosa.
-#  - TIMEOUTS LARGOS (Ready Unknown/False @ 900s, nodeStartupTimeout 25m): el CP tarda hasta 15m en
-#    bootear sobre Longhorn; no queremos remediar por un blip de red (la LAN/anidado es flaky).
-#  - Sin maxUnhealthy custom (default 100%): un worker muerto se recrea solo (la MachineDeployment lo
-#    repone). OJO: con UN solo nodo hypervisor, si cae el nodo entero TODAS las Machines caen a la vez
-#    y la remediación no puede recrear hasta que el nodo vuelva — en producción multi-nodo se baja
-#    maxUnhealthy (~40%) para que un fallo de nodo remedie sólo su parte y corte cortocircuito ante
-#    outages infra-wide. Acá lo dejamos demostrando el feature; el fix real del SPOF es multi-nodo.
+# DESIGN (deliberate for this nested homelab, see README §3.2):
+#  - SCOPED TO WORKERS (matchExpression control-plane DoesNotExist). We do NOT remediate the control-plane
+#    automatically: recreating a CP mid-flap can strand the immutable controlPlaneEndpoint
+#    (an incident already hit) — the KubeadmControlPlane has its own, more careful remediation.
+#  - LONG TIMEOUTS (Ready Unknown/False @ 900s, nodeStartupTimeout 25m): the CP takes up to 15m to
+#    boot on Longhorn; we don't want to remediate on a network blip (the LAN/nested net is flaky).
+#  - No custom maxUnhealthy (default 100%): a dead worker is recreated on its own (the MachineDeployment
+#    replaces it). NOTE: with a SINGLE hypervisor node, if the whole node dies ALL Machines drop at once
+#    and remediation can't recreate until the node returns — in multi-node production you lower
+#    maxUnhealthy (~40%) so a node failure only remediates its share and short-circuits
+#    fleet-wide outages. Here we keep it to demonstrate the feature; the real SPOF fix is multi-node.
 apiVersion: cluster.x-k8s.io/v1beta1
 kind: MachineHealthCheck
 metadata:

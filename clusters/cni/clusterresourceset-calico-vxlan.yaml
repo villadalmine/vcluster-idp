@@ -1,7 +1,7 @@
-# ClusterResourceSet — variante VXLAN de Calico, PER-HOST. Se inyecta SOLO en los Cluster que la
-# Composition etiqueta cni=calico-vxlan (p.ej. clusters regionales sobre KubeVirt anidado donde el
-# IPIP de Calico —protocolo 4— NO atraviesa el masquerade entre VMs y tira el tráfico cross-node).
-# VXLAN va sobre UDP 4789 y sí pasa. host-a (cni=calico, IPIP) queda intacto.
+# ClusterResourceSet — VXLAN variant of Calico, PER-HOST. Injected ONLY into Clusters that the
+# Composition labels cni=calico-vxlan (e.g. regional clusters on nested KubeVirt where Calico's
+# IPIP —protocol 4— does NOT cross the per-VM masquerade and drops cross-node traffic).
+# VXLAN runs over UDP 4789 and does pass. host-a (cni=calico, IPIP) stays untouched.
 apiVersion: addons.cluster.x-k8s.io/v1beta1
 kind: ClusterResourceSet
 metadata:

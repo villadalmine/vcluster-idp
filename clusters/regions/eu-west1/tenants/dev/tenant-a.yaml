@@ -1,7 +1,7 @@
-# Tenant dev en la región eu-west1. Lo lee el ApplicationSet vclusters-eu-west1 (que corre en
-# el ArgoCD del cluster regional) y materializa un vCluster aislado en ese cluster.
-# Está FUERA de tenants/ (el path global) a propósito: así los appsets del management
-# (tenants/**) no lo agarran — cada región es independiente.
+# Dev tenant in region eu-west1. Read by the vclusters-eu-west1 ApplicationSet (running in
+# the regional cluster's ArgoCD) and materializes an isolated vCluster on that cluster.
+# It's OUTSIDE tenants/ (the global path) on purpose: so the management appsets
+# (tenants/**) don't pick it up — each region is independent.
 tenant:
   name: tenant-a
   environment: dev
