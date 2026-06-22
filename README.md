@@ -154,7 +154,7 @@ To see the CLI commands, automatic vCluster provisioning, sync waves, and E2E va
     </td>
     <td align="center" width="25%">
       <b>3. Full Platform Showcase</b><br/>
-      <a href="https://asciinema.org/a/jr3CRkDl1eXs4pLr" target="_blank">
+      <a href="https://asciinema.org/a/6410kw90e19yRbU2" target="_blank">
         <img src="https://asciinema.org/img/play-button.png" width="80" alt="Platform Showcase"/>
       </a>
     </td>
@@ -218,8 +218,8 @@ Running passive and read-only checks...
   • Checking advertised vGPU resources on node srv-t7910...
   ✔ Node srv-t7910 advertises vGPU capacity: 20 virtual cores/slices available.
   • Physical GPU configuration detected by HAMi:
-      • NVIDIA-Quadro M4000: 8192 MiB VRAM total, 10 slices vGPU, modo hami-core
       • NVIDIA-Tesla P4: 7680 MiB VRAM total, 10 slices vGPU, modo hami-core
+      • NVIDIA-Quadro M4000: 8192 MiB VRAM total, 10 slices vGPU, modo hami-core
 
 ═══════════════════════════════════════════════════════════════════════════
  3. Declarative Infrastructure Composition (Crossplane v2)
@@ -285,8 +285,30 @@ Running passive and read-only checks...
  ℹ️ What this demonstrates: Real connectivity validation via jump pod inside the management pod network. Verifies that the remote cluster is running, nodes are ready, CNI is healthy, and its local ArgoCD is active.
 
   • Interacting with host-euw1 (jump pod)...
-    
+
     ══ CLUSTER host-euw1 ══
+      ✔ CAPI: phase=Provisioned controlPlaneReady=true
+      ✔ nodes Ready: 2
+          - host-euw1-control-plane-gw2k6  Ready  (control-plane)  → VM on hypervisor node: srv-t7910
+          - host-euw1-md-0-lvzrh-8twht  Ready  (<none>)  → VM on hypervisor node: srv-t7910
+      ✔ CNI pods Running: 3
+          - calico-kube-controllers-5d7d9cdfd8-sft8p  (Running)
+          - calico-node-6s5cl  (Running)
+          - calico-node-c2mnh  (Running)
+      ✔ cross-node DNS (MTU): OK
+      ✔ StorageClasses: 1
+          - local-path
+      ✔ ArgoCD apps: 3
+          - region-root  Synced/Healthy
+          - vcluster-tenant-a-dev  Synced/Healthy
+          - wl-tenant-a-dev  Synced/Healthy
+      ✔ vClusters: 1
+          - vcluster-register-29701455-dlhqc  (Completed)
+          - coredns-df8c87f55-2p65n-x-kube-system-x-vcluster-tenant-a-dev  (Running)
+          - tenant-a-customer-api-897db9d68-hhht5-x-tenant-a-x-v-c0cc5d9b3f  (Running)
+          - tenant-a-customer-web-5fcdf6ccb5-9dqnz-x-tenant-a-x--90200e5fc1  (Running)
+          - tenant-a-postgres-0-x-tenant-a-x-vcluster-tenant-a-dev  (Running)
+          - vcluster-tenant-a-dev-0  (Running)
 
 ═══════════════════════════════════════════════════════════════════════════
  7. Tenant Virtual Control Plane & Network Isolation (vCluster + CNP)
@@ -294,17 +316,17 @@ Running passive and read-only checks...
  ℹ️ What this demonstrates: Virtual API server and etcd per tenant via vCluster, avoiding CRD conflicts. Physical network is isolated with host-side CiliumNetworkPolicies, blocking cross-tenant traffic.
 
   • Listing active vClusters on the host...
-        
-                      NAME             |          NAMESPACE           | STATUS  | VERSION | CONNECTED |  AGE   
-        -------------------------------+------------------------------+---------+---------+-----------+--------
-          vcluster-tenant-a-acceptance | vcluster-tenant-a-acceptance | Running | 0.35.0  |           | 4d1h   
-          vcluster-tenant-a-dev        | vcluster-tenant-a-dev        | Running | 0.35.0  |           | 4d1h   
-          vcluster-tenant-a-prod       | vcluster-tenant-a-prod       | Running | 0.35.0  |           | 4d1h   
-          vcluster-tenant-b-dev        | vcluster-tenant-b-dev        | Running | 0.35.0  |           | 4d1h   
-          vcluster-tenant-c-dev        | vcluster-tenant-c-dev        | Running | 0.35.0  |           | 3d21h  
-          vcluster-tenant-x-dev        | vcluster-tenant-x-dev        | Running | 0.35.0  |           | 21h    
-          vcluster-tenant-y-dev        | vcluster-tenant-y-dev        | Running | 0.35.0  |           | 21h    
-        
+
+                      NAME             |          NAMESPACE           | STATUS  | VERSION | CONNECTED | AGE
+        -------------------------------+------------------------------+---------+---------+-----------+-------
+          vcluster-tenant-a-acceptance | vcluster-tenant-a-acceptance | Running | 0.35.0  |           | 4d4h
+          vcluster-tenant-a-dev        | vcluster-tenant-a-dev        | Running | 0.35.0  |           | 4d4h
+          vcluster-tenant-a-prod       | vcluster-tenant-a-prod       | Running | 0.35.0  |           | 4d4h
+          vcluster-tenant-b-dev        | vcluster-tenant-b-dev        | Running | 0.35.0  |           | 4d4h
+          vcluster-tenant-c-dev        | vcluster-tenant-c-dev        | Running | 0.35.0  |           | 4d
+          vcluster-tenant-x-dev        | vcluster-tenant-x-dev        | Running | 0.35.0  |           | 24h
+          vcluster-tenant-y-dev        | vcluster-tenant-y-dev        | Running | 0.35.0  |           | 24h
+
   • Checking network isolation policies (CiliumNetworkPolicy) on the host...
   ✔ Found 7 CiliumNetworkPolicies on the host:
       vcluster-tenant-a-acceptance   tenant-a-isolation
