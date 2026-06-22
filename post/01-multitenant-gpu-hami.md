@@ -184,7 +184,6 @@ Prompt: "Write a short, funny love story between two Kubernetes pods."
 
 ━━ Real cards -> HAMi-sliced -> hard-capped, measured, quota-enforced, multi-GPU -> live LLM. ━━
 
-0
 ```
 
 </details>
