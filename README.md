@@ -142,7 +142,7 @@ Real, live terminal recordings (asciinema) — click to play:
   <tr>
     <td align="center" width="25%">
       <b>1. Tenant Provisioning</b><br/>
-      <a href="https://asciinema.org/a/UdbQ4LQtlxruy9WH" target="_blank">
+      <a href="https://asciinema.org/a/mQjTa1coPCb8V8RM" target="_blank">
         <img src="https://asciinema.org/img/play-button.png" width="80" alt="Tenant Provisioning"/>
       </a>
     </td>
