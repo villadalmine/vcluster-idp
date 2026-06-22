@@ -160,7 +160,7 @@ To see the CLI commands, automatic vCluster provisioning, sync waves, and E2E va
     </td>
     <td align="center" width="25%">
       <b>4. Topology & Hierarchy</b><br/>
-      <a href="https://asciinema.org/a/TQpjLRr3aDq3caay" target="_blank">
+      <a href="https://asciinema.org/a/UrysCfqUb5KQi5p8" target="_blank">
         <img src="https://asciinema.org/img/play-button.png" width="80" alt="Topology Showcase"/>
       </a>
     </td>
@@ -386,22 +386,22 @@ Platform Topology & vCluster Models Showcase (read-only, live)
  ℹ️ Concept: The physical HA k3s cluster wears two hats at once: it runs KubeVirt (so it is the VM hypervisor) and it also runs tenant vClusters directly on itself (centralized).
 
   • Physical cluster nodes (the substrate):
-      srv-pi-rack1          Ready   <none>                      30d     v1.35.5+k3s1   192.168.178.65    <none>   Ubuntu 24.04.3 LTS   6.8.0-1053-raspi      containerd://2.2.3-k3s1
-      srv-pi-rack2a         Ready   <none>                      30d     v1.35.5+k3s1   192.168.178.40    <none>   Ubuntu 24.04.1 LTS   6.8.0-1053-raspi      containerd://2.2.3-k3s1
-      srv-pi-rack2b         Ready   <none>                      30d     v1.35.5+k3s1   192.168.178.130   <none>   Ubuntu 24.10         6.11.0-1015-raspi     containerd://2.2.3-k3s1
-      srv-rk1-nvme-01       Ready   <none>                      30d     v1.35.5+k3s1   192.168.178.131   <none>   Ubuntu 24.04.1 LTS   6.1.0-1025-rockchip   containerd://2.2.3-k3s1
-      srv-rk1-nvme-02       Ready   <none>                      30d     v1.35.5+k3s1   192.168.178.48    <none>   Ubuntu 24.04.1 LTS   6.1.0-1025-rockchip   containerd://2.2.3-k3s1
-      srv-rk1-nvme-03       Ready   <none>                      30d     v1.35.5+k3s1   192.168.178.51    <none>   Ubuntu 24.04.1 LTS   6.1.0-1025-rockchip   containerd://2.2.3-k3s1
-      srv-rk1-nvme-04       Ready   <none>                      30d     v1.35.5+k3s1   192.168.178.54    <none>   Ubuntu 24.04.1 LTS   6.1.0-1025-rockchip   containerd://2.2.3-k3s1
-      srv-super6c-01-nvme   Ready   control-plane,etcd,worker   31d     v1.35.5+k3s1   192.168.178.120   <none>   Ubuntu 24.04.4 LTS   6.8.0-1053-raspi      containerd://2.2.3-k3s1
-      srv-super6c-02-nvme   Ready   control-plane,etcd,worker   2d23h   v1.35.5+k3s1   192.168.178.121   <none>   Ubuntu 24.04.4 LTS   6.8.0-1053-raspi      containerd://2.2.3-k3s1
-      srv-super6c-04-nvme   Ready   control-plane,etcd,worker   2d22h   v1.35.5+k3s1   192.168.178.122   <none>   Ubuntu 24.04.4 LTS   6.8.0-1047-raspi      containerd://2.2.3-k3s1
-      srv-super6c-05-emmc   Ready   <none>                      2d21h   v1.35.5+k3s1   192.168.178.124   <none>   Ubuntu 24.04.4 LTS   6.8.0-1051-raspi      containerd://2.2.3-k3s1
-      srv-super6c-06-emmc   Ready   <none>                      2d21h   v1.35.5+k3s1   192.168.178.123   <none>   Ubuntu 24.04.4 LTS   6.8.0-1053-raspi      containerd://2.2.3-k3s1
-      srv-t7910             Ready   <none>                      9d      v1.35.5+k3s1   192.168.178.90    <none>   Ubuntu 26.04 LTS     7.0.0-22-generic      containerd://2.2.3-k3s1
+      srv-pi-rack1          Ready   <none>                      30d    v1.35.5+k3s1   192.168.178.65    <none>   Ubuntu 24.04.3 LTS   6.8.0-1053-raspi      containerd://2.2.3-k3s1
+      srv-pi-rack2a         Ready   <none>                      30d    v1.35.5+k3s1   192.168.178.40    <none>   Ubuntu 24.04.1 LTS   6.8.0-1053-raspi      containerd://2.2.3-k3s1
+      srv-pi-rack2b         Ready   <none>                      30d    v1.35.5+k3s1   192.168.178.130   <none>   Ubuntu 24.10         6.11.0-1015-raspi     containerd://2.2.3-k3s1
+      srv-rk1-nvme-01       Ready   <none>                      30d    v1.35.5+k3s1   192.168.178.131   <none>   Ubuntu 24.04.1 LTS   6.1.0-1025-rockchip   containerd://2.2.3-k3s1
+      srv-rk1-nvme-02       Ready   <none>                      30d    v1.35.5+k3s1   192.168.178.48    <none>   Ubuntu 24.04.1 LTS   6.1.0-1025-rockchip   containerd://2.2.3-k3s1
+      srv-rk1-nvme-03       Ready   <none>                      30d    v1.35.5+k3s1   192.168.178.51    <none>   Ubuntu 24.04.1 LTS   6.1.0-1025-rockchip   containerd://2.2.3-k3s1
+      srv-rk1-nvme-04       Ready   <none>                      30d    v1.35.5+k3s1   192.168.178.54    <none>   Ubuntu 24.04.1 LTS   6.1.0-1025-rockchip   containerd://2.2.3-k3s1
+      srv-super6c-01-nvme   Ready   control-plane,etcd,worker   31d    v1.35.5+k3s1   192.168.178.120   <none>   Ubuntu 24.04.4 LTS   6.8.0-1053-raspi      containerd://2.2.3-k3s1
+      srv-super6c-02-nvme   Ready   control-plane,etcd,worker   3d2h   v1.35.5+k3s1   192.168.178.121   <none>   Ubuntu 24.04.4 LTS   6.8.0-1053-raspi      containerd://2.2.3-k3s1
+      srv-super6c-04-nvme   Ready   control-plane,etcd,worker   3d1h   v1.35.5+k3s1   192.168.178.122   <none>   Ubuntu 24.04.4 LTS   6.8.0-1047-raspi      containerd://2.2.3-k3s1
+      srv-super6c-05-emmc   Ready   <none>                      3d     v1.35.5+k3s1   192.168.178.124   <none>   Ubuntu 24.04.4 LTS   6.8.0-1051-raspi      containerd://2.2.3-k3s1
+      srv-super6c-06-emmc   Ready   <none>                      3d     v1.35.5+k3s1   192.168.178.123   <none>   Ubuntu 24.04.4 LTS   6.8.0-1053-raspi      containerd://2.2.3-k3s1
+      srv-t7910             Ready   <none>                      9d     v1.35.5+k3s1   192.168.178.90    <none>   Ubuntu 26.04 LTS     7.0.0-22-generic      containerd://2.2.3-k3s1
 
   • KubeVirt virtualization engine running on the substrate:
-      virt-handler-jz9lq   1/1   Running   102 (5h58m ago)   2d20h   10.0.6.222   srv-t7910   <none>   <none>
+      virt-handler-jz9lq   1/1   Running   102 (8h ago)   2d23h   10.0.6.222   srv-t7910   <none>   <none>
   ✔ srv-t7910 is the KubeVirt hypervisor — and (see §4) the same cluster also hosts vClusters.
 
 ═══════════════════════════════════════════════════════════════════════════
@@ -426,7 +426,7 @@ Platform Topology & vCluster Models Showcase (read-only, live)
 ═══════════════════════════════════════════════════════════════════════════
  3. Each host runs its OWN ArgoCD + its OWN vClusters (MODELS 3 & 4)
 ═══════════════════════════════════════════════════════════════════════════
- ℹ️ Concept: Decentralized GitOps: the management ArgoCD only creates clusters; each created REGIONAL host (role=regional) gets its own ArgoCD (via CAAPH) seeded with a region-root, and provisions ITS region's vClusters locally — no central SPOF. A management-role host (host-mgmt) NEVER hosts tenants itself: it CREATES a regional child (mgmt-child, role=regional) — the 'management-child' rung — and THAT child hosts them. (management = creates clusters; regional = hosts tenant vClusters.)
+ ℹ️ Concept: Decentralized GitOps: the management ArgoCD only creates clusters; each created host (role=management) gets its own ArgoCD (via CAAPH) seeded with a region-root, and provisions ITS region's vClusters locally — no central SPOF. A host promoted to management is the 'management-child' rung.
 
   • Management-role clusters (each runs its own ArgoCD):
       host-mgmt (region=none) → local ArgoCD apps: 1
@@ -476,7 +476,7 @@ Platform Topology & vCluster Models Showcase (read-only, live)
       addonprovider.operator.cluster.x-k8s.io/helm ready=True
 
   • host-mgmt CREATED a child cluster (mgmt-child); its VMs run on the ROOT's KubeVirt (via external-infra):
-      default   mgmt-child         Provisioned   115m   
+      default   mgmt-child         Provisioned   4h53m
       mgmt-child-control-plane-dbhws   10.0.6.13    Running
       mgmt-child-md-0-pr2jw-jttlf      10.0.6.147   Running
 
