@@ -5,6 +5,7 @@ Track here the posts you want to make. Write each as its own file, copy-paste wh
 | # | Post | Asset(s) | Status |
 |---|---|---|---|
 | 01 | [Multi-tenant GPU on bare metal (HAMi)](./01-multitenant-gpu-hami.md) | video `eaoQKFsHhVDQ7qXc` + `bonus/gpu-architecture.png` | draft |
+| 02 | [vCluster on an existing cluster](./02-vcluster-on-existing-cluster.md) | video `OR3lKd81K3zGNI4i` + Add/Validate/Delete | draft |
 
 **How to use:** open the post file, pick the EN or ES version, copy-paste, attach the PNG (and/or the
 asciinema link / a screen-capture of the cast). Add new ideas as `02-...md`, `03-...md`, etc.

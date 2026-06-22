@@ -13,6 +13,8 @@ on a homelab. Each post has a live terminal recording (asciinema) and the source
 |:--:|---|---|:--:|
 | **01** | **[Multi-tenant GPU on bare metal (HAMi)](./01-multitenant-gpu-hami.html)** | 3 isolated tenants share 2 physical GPUs (no MIG, no passthrough). Each runs a local LLM that tells a Kubernetes story — hard-capped &amp; metered per tenant. | [▶︎](https://asciinema.org/a/eaoQKFsHhVDQ7qXc) |
 
+| **02** | **[vCluster on an existing cluster](./02-vcluster-on-existing-cluster.html)** | What vCluster is, how we wire it with Helm + ArgoCD ApplicationSets, namespace-as-a-service vs vCluster, and when each vCluster isolation model fits. A homelab lab. | [▶︎](https://asciinema.org/a/OR3lKd81K3zGNI4i) |
+
 <!-- add new rows here as you publish: | 02 | [Title](./02-slug.html) | ... | [▶︎](asciinema-link) | -->
 
 ---
