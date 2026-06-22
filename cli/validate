@@ -99,8 +99,8 @@ x() {
   fi
 }
 
-# ── Fase 0 — estático ───────────────────────────────────────────────────────
-sec "Static (Fase 0)"
+# ── Phase 0 — static ───────────────────────────────────────────────────────
+sec "Static (Phase 0)"
 x "helm lint charts/tenant" "helm lint charts/tenant"
 x "helm template t charts/tenant --set tenant.name='$TENANT' --set tenant.environment='$ENV' 2>/dev/null | grep -q 'argocd.argoproj.io/sync-wave'" "sync-wave annotations render (req 10)"
 
@@ -114,10 +114,10 @@ for app in "vcluster-$TENANT-$ENV" "wl-$TENANT-$ENV" "route-$TENANT-$ENV"; do
   x "[ \"\$(kubectl -n '$ARGOCD_NS' get application '$app' -o jsonpath='{.status.health.status}' 2>/dev/null)\" = 'Healthy' ]" "$app Healthy"
 done
 
-# ── vCluster + registro (req 1, 2, Fase 2) ─────────────────────────────────
+# ── vCluster + registration (req 1, 2, Phase 2) ─────────────────────────────────
 sec "vCluster + registration"
 x "vcluster list 2>/dev/null | grep -qE '^\s*$NS\s.*Running'" "vCluster $NS Running (req 1)"
-x "kubectl -n '$ARGOCD_NS' get secret -l argocd.argoproj.io/secret-type=cluster -o name 2>/dev/null | grep -q '/$NS$'" "vCluster registered in ArgoCD (Fase 2)"
+x "kubectl -n '$ARGOCD_NS' get secret -l argocd.argoproj.io/secret-type=cluster -o name 2>/dev/null | grep -q '/$NS$'" "vCluster registered in ArgoCD (Phase 2)"
 
 # ── Req 3 — namespace + pg + 2 apps + credenciales ──────────────────────────
 sec "Req 3 — tenant contents"

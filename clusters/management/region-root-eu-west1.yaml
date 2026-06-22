@@ -1,9 +1,9 @@
-# El "region-root" de eu-west1: app-of-apps que se SIEMBRA en el ArgoCD del cluster regional
-# (no se aplica en el management). Apunta DIRECTO a la base COMPARTIDA clusters/regions/_base y le
-# setea la región con kustomize.patches (REGION → eu-west1). Es la ÚNICA pieza por-región: agregar
-# una región = copiar este archivo cambiando "eu-west1". Ver clusters/regions/README.md
-# NO se aplica directo: kustomize lo empaqueta en el ConfigMap region-root-eu-west1 y el
-# ClusterResourceSet lo inyecta en el cluster con label platform.idp/region=eu-west1.
+# The eu-west1 "region-root": an app-of-apps SEEDED into the regional cluster's ArgoCD
+# (not applied on the management). Points DIRECTLY at the SHARED base clusters/regions/_base and
+# sets the region via kustomize.patches (REGION → eu-west1). It is the ONLY per-region piece: adding
+# a region = copy this file changing "eu-west1". See clusters/regions/README.md
+# NOT applied directly: kustomize packs it into the region-root-eu-west1 ConfigMap and the
+# ClusterResourceSet injects it into the cluster labeled platform.idp/region=eu-west1.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -14,7 +14,7 @@ spec:
   source:
     repoURL: https://github.com/villadalmine/vcluster-idp.git
     targetRevision: HEAD
-    path: clusters/regions/_base          # base compartida; la región la pone el patch de abajo
+    path: clusters/regions/_base          # shared base; the region is set by the patch below
     kustomize:
       patches:
         - target: { group: argoproj.io, kind: ApplicationSet, name: vclusters-REGION }
@@ -28,7 +28,7 @@ spec:
             - { op: replace, path: /spec/generators/0/git/files/0/path, value: "clusters/regions/eu-west1/tenants/**/*.yaml" }
             - { op: replace, path: /spec/template/metadata/labels/platform.idp~1region, value: eu-west1 }
   destination:
-    server: https://kubernetes.default.svc   # el propio cluster regional
+    server: https://kubernetes.default.svc   # the regional cluster itself
     namespace: argocd
   syncPolicy:
     automated: { prune: true, selfHeal: true }

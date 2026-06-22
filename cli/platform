@@ -15,7 +15,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENVIRONMENT="${PLATFORM_ENV:-dev}"
-REGION="${PLATFORM_REGION:-}"    # vacío = tenant CENTRALIZADO (Root); set = tenant REGIONAL (host <region>, ArgoCD propio)
+REGION="${PLATFORM_REGION:-}"    # empty = CENTRALIZED tenant (Root); set = REGIONAL tenant (host <region>, its own ArgoCD)
 API_VERSION=""
 WEB_VERSION=""
 DOMAIN="${PLATFORM_DOMAIN:-example.local}"
@@ -70,9 +70,9 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# CENTRALIZADO (Root): tenants/<env>/<t>.yaml lo lee el ApplicationSet del Root.
-# REGIONAL (--region <r>): clusters/regions/<r>/tenants/<env>/<t>.yaml lo lee el ApplicationSet que corre
-# en el ArgoCD PROPIO del host <r> (descentralizado, sin SPOF). Mismo facade, misma fuente-de-verdad GitOps.
+# CENTRALIZED (Root): tenants/<env>/<t>.yaml is read by the Root's ApplicationSet.
+# REGIONAL (--region <r>): clusters/regions/<r>/tenants/<env>/<t>.yaml is read by the ApplicationSet running
+# in host <r>'s OWN ArgoCD (decentralized, no SPOF). Same facade, same GitOps source of truth.
 if [[ -n "$REGION" ]]; then
   TENANT_FILE="$REPO_ROOT/clusters/regions/$REGION/tenants/$ENVIRONMENT/$TENANT.yaml"
 else
@@ -134,10 +134,10 @@ cmd_delete() {
   else
     warn "$TENANT_FILE does not exist (idempotent: nothing to delete)"
   fi
-  # Backup direct cleanup (CENTRALIZADO): el vCluster vive en el contexto actual (Root) → borrar el ns
-  # cascadea PVC/leftovers. REGIONAL: el ns vive en el host <region> (otro kubeconfig), NO en el contexto
-  # actual → NO lo tocamos acá; el prune de GitOps baja el workload y el GC del CronJob vcluster-register
-  # limpia el cluster-secret de registro + ns/PVC huérfanos en el host.
+  # Backup direct cleanup (CENTRALIZED): the vCluster lives in the current context (Root) → deleting the ns
+  # cascades PVC/leftovers. REGIONAL: the ns lives on host <region> (a different kubeconfig), NOT in the
+  # current context → we don't touch it here; GitOps prune removes the workload and the vcluster-register
+  # CronJob GCs the registration cluster-secret + orphan ns/PVC on the host.
   if [[ -z "$REGION" ]] && command -v kubectl >/dev/null 2>&1; then
     kubectl delete ns "$VC_NS" --ignore-not-found --wait=false 2>/dev/null || true
   fi

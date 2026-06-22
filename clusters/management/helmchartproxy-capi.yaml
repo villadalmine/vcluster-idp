@@ -1,10 +1,10 @@
-# Fase 2 (management-of-managements): instala Cluster API DENTRO de los clusters role=management
-# (hoy host-mgmt) vía CAAPH/Helm — el mismo patrón con el que les instalamos ArgoCD. Así host-mgmt
-# deja de ser sólo "tiene ArgoCD" y pasa a ser un MANAGEMENT de verdad: puede CREAR host clusters.
-# El chart cluster-api-operator instala el operator + los providers (core/bootstrap/controlPlane +
-# infra kubevirt) declarados por values, y su propio cert-manager (host-mgmt no tiene uno).
-# El CAPK de host-mgmt creará las VMs del hijo sobre el KubeVirt del Root (external-infra; ver el
-# manifest del hijo en clusters/management-child/). Selector role=management → NO toca los regional.
+# Phase 2 (management-of-managements): installs Cluster API INTO the role=management clusters
+# (today host-mgmt) via CAAPH/Helm — the same pattern used to install ArgoCD. This way host-mgmt
+# goes from just "has ArgoCD" to a real MANAGEMENT: it can CREATE host clusters.
+# The cluster-api-operator chart installs the operator + the providers (core/bootstrap/controlPlane +
+# infra kubevirt) declared via values, and its own cert-manager (host-mgmt has none).
+# host-mgmt's CAPK creates the child's VMs on the Root's KubeVirt (external-infra; see the
+# child manifest in clusters/management/). Selector role=management → does NOT touch the regional clusters.
 apiVersion: addons.cluster.x-k8s.io/v1alpha1
 kind: HelmChartProxy
 metadata:
@@ -16,7 +16,7 @@ spec:
       platform.idp/role: management
   repoURL: https://kubernetes-sigs.github.io/cluster-api-operator
   chartName: cluster-api-operator
-  version: "0.21.0"          # mismo pin que el Root (platform/addons/cluster-api-operator.yaml)
+  version: "0.21.0"          # same pin as the Root (platform/addons/cluster-api-operator.yaml)
   releaseName: capi-operator
   namespace: capi-operator-system
   options:
@@ -26,9 +26,9 @@ spec:
     wait: true
   valuesTemplate: |
     cert-manager:
-      enabled: false         # se instala por separado (helmchartproxy-certmanager.yaml) para evitar el
-                             # race de CRDs; CAAPH reintenta este install hasta que cert-manager esté listo.
-    # Schema del chart 0.21.0 (verificado con `helm show values`): providers = objetos keyed por nombre.
+      enabled: false         # installed separately (helmchartproxy-certmanager.yaml) to avoid the
+                             # CRD race; CAAPH retries this install until cert-manager is ready.
+    # Chart 0.21.0 schema (verified with `helm show values`): providers = objects keyed by name.
     core:
       cluster-api:
         version: v1.10.10
@@ -40,9 +40,9 @@ spec:
         version: v1.10.10
     infrastructure:
       kubevirt:
-        version: v0.10.5     # CAPK v1beta1-contract (igual que el Root)
+        version: v0.10.5     # CAPK v1beta1-contract (same as the Root)
     addon:
       helm:
-        version: v0.4.2      # CAAPH (HelmChartProxy) — host-mgmt instala ArgoCD EN su hijo (mgmt-child),
-                             # igual que el Root lo instala en sus regionales. Recursión: el hijo termina
-                             # con su PROPIO ArgoCD descentralizado (sin SPOF). v0.4.2 = último v1beta1-contract.
+        version: v0.4.2      # CAAPH (HelmChartProxy) — host-mgmt installs ArgoCD IN its child (mgmt-child),
+                             # same as the Root installs it on its regionals. Recursion: the child ends
+                             # with its OWN decentralized ArgoCD (no SPOF). v0.4.2 = last v1beta1-contract.

@@ -1,7 +1,7 @@
-# Siembra el bundle de addons (mgmt-child-addons.yaml) DENTRO de host-mgmt (role=management) — la pieza
-# que vuelve "recursivo" el modelo: host-mgmt no sólo crea mgmt-child, también le entrega su propio ArgoCD
-# (CAAPH) y su region-root (CRS), igual que el Root con sus regionales. ApplyOnce, reintenta hasta que los
-# CRDs (HelmChartProxy, ClusterResourceSet) existan en host-mgmt (los instala el CAPI operator + el addon helm).
+# Seeds the addons bundle (mgmt-child-addons.yaml) INTO host-mgmt (role=management) — the piece
+# that makes the model "recursive": host-mgmt not only creates mgmt-child, it also delivers it its own ArgoCD
+# (CAAPH) and its region-root (CRS), like the Root does for its regionals. ApplyOnce, retries until the
+# CRDs (HelmChartProxy, ClusterResourceSet) exist in host-mgmt (installed by the CAPI operator + the helm addon).
 apiVersion: addons.cluster.x-k8s.io/v1beta1
 kind: ClusterResourceSet
 metadata:
@@ -11,7 +11,7 @@ spec:
   clusterSelector:
     matchLabels:
       platform.idp/role: management
-  strategy: Reconcile   # git = fuente continua: cambios en el bundle (p.ej. agregar child-cni) propagan al host-mgmt
+  strategy: Reconcile   # git = continuous source of truth: bundle changes (e.g. adding child-cni) propagate to host-mgmt
   resources:
     - name: mgmt-child-addons
       kind: ConfigMap

@@ -1,14 +1,14 @@
-# Fase 3 (recursión completa) — estos 3 objetos se SIEMBRAN DENTRO de host-mgmt (vía el CRS del Root
-# mgmt-child-addons) y hacen que host-mgmt entregue ArgoCD + un region-root a su hijo (mgmt-child),
-# EXACTAMENTE como el Root se los entrega a sus regionales, un escalón más abajo. Resultado: mgmt-child
-# queda con su PROPIO ArgoCD descentralizado que despliega su propio vCluster (sin SPOF). namespace=default
-# porque el Cluster mgmt-child vive en default dentro de host-mgmt (HelmChartProxy/CRS seleccionan en su ns).
+# Phase 3 (full recursion) — these 3 objects are SEEDED INTO host-mgmt (via the Root CRS
+# mgmt-child-addons) and make host-mgmt deliver ArgoCD + a region-root to its child (mgmt-child),
+# EXACTLY as the Root delivers them to its regionals, one rung down. Result: mgmt-child
+# ends up with its OWN decentralized ArgoCD that deploys its own vCluster (no SPOF). namespace=default
+# because the mgmt-child Cluster lives in default inside host-mgmt (HelmChartProxy/CRS select within their ns).
 #
-# 0) CNI del hijo (huevo-gallina): mgmt-child NO puede correr su propio ArgoCD sin CNI, así que el CNI
-#    debe venir de AFUERA, vía host-mgmt, ANTES. Esta Application corre en el ArgoCD de host-mgmt y aplica
-#    clusters/cni en su PROPIO ns default → crea el CRS calico-vxlan-cni en host-mgmt → su CRS controller
-#    (CAPI core) siembra Calico en mgmt-child (label cni=calico-vxlan). Self-hosted calico-node (host-network)
-#    bootstrapea el CNI sin necesitar CNI (por eso CRS y no el helm del tigera-operator, que sí necesitaría CNI).
+# 0) Child CNI (chicken-and-egg): mgmt-child CANNOT run its own ArgoCD without a CNI, so the CNI
+#    must come from OUTSIDE, via host-mgmt, FIRST. This Application runs in host-mgmt's ArgoCD and applies
+#    clusters/cni into its OWN default ns → creates the calico-vxlan-cni CRS in host-mgmt → its CRS controller
+#    (CAPI core) seeds Calico into mgmt-child (label cni=calico-vxlan). Self-hosted calico-node (host-network)
+#    bootstraps the CNI without needing a CNI (hence CRS, not the tigera-operator helm, which would need a CNI).
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -21,17 +21,17 @@ spec:
     targetRevision: HEAD
     path: clusters/cni
     kustomize:
-      namespace: default     # el Cluster mgmt-child vive en default → el CRS debe estar en su mismo ns
+      namespace: default     # the mgmt-child Cluster lives in default → the CRS must be in the same ns
   destination:
-    server: https://kubernetes.default.svc   # host-mgmt mismo
+    server: https://kubernetes.default.svc   # host-mgmt itself
     namespace: default
   syncPolicy:
     automated: { prune: true, selfHeal: true }
     syncOptions:
       - CreateNamespace=true
-      - ServerSideApply=true   # los CRDs de Calico son grandes
+      - ServerSideApply=true   # Calico's CRDs are large
 ---
-# 1) CAAPH: host-mgmt instala ArgoCD DENTRO de mgmt-child (selector role=regional, igual que el Root).
+# 1) CAAPH: host-mgmt installs ArgoCD INTO mgmt-child (selector role=regional, same as the Root).
 apiVersion: addons.cluster.x-k8s.io/v1alpha1
 kind: HelmChartProxy
 metadata:
@@ -55,9 +55,9 @@ spec:
       params:
         server.insecure: true
 ---
-# 2) ConfigMap que empaqueta el region-root del hijo (lo desempaca el CRS de abajo en el ArgoCD de mgmt-child).
-#    El region-root apunta a la MISMA base compartida clusters/regions/_base y la parametriza a region=mc-euw1
-#    (espejo de region-root-eu-west1.yaml del Root). Así el hijo provisiona su propio vCluster por tenant.
+# 2) ConfigMap that packs the child's region-root (the CRS below unpacks it into mgmt-child's ArgoCD).
+#    The region-root points at the SAME shared base clusters/regions/_base and parametrizes it to region=mc-euw1
+#    (mirror of the Root's region-root-eu-west1.yaml). This way the child provisions its own vCluster per tenant.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -96,8 +96,8 @@ data:
         syncOptions:
           - CreateNamespace=true
 ---
-# 3) CRS DENTRO de host-mgmt: siembra el region-root (ConfigMap de arriba) en el ArgoCD de mgmt-child.
-#    ApplyOnce, reintenta hasta que exista el CRD Application (lo instala el CAAPH de arriba). selector region=mc-euw1.
+# 3) CRS INSIDE host-mgmt: seeds the region-root (ConfigMap above) into mgmt-child's ArgoCD.
+#    ApplyOnce, retries until the Application CRD exists (installed by the CAAPH above). selector region=mc-euw1.
 apiVersion: addons.cluster.x-k8s.io/v1beta1
 kind: ClusterResourceSet
 metadata:

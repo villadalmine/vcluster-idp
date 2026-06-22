@@ -1,18 +1,18 @@
-# Cluster HIJO creado por host-mgmt (management-of-managements). Se aplica EN host-mgmt; su CAPK crea las
-# VMs en el KubeVirt del Root vía external-infra (KubevirtCluster.spec.infraClusterSecretRef → secret
-# mgmt-child-infra con el kubeconfig al Root). DataVolume sobre Longhorn (30Gi, evita disk-pressure) + amd64/t7910.
-# Primero a mano para validar; luego se sirve por GitOps (CRS → ArgoCD de host-mgmt).
+# CHILD cluster created by host-mgmt (management-of-managements). Applied IN host-mgmt; its CAPK creates the
+# VMs on the Root's KubeVirt via external-infra (KubevirtCluster.spec.infraClusterSecretRef → secret
+# mgmt-child-infra holding the kubeconfig to the Root). DataVolume on Longhorn (30Gi, avoids disk-pressure) + amd64/t7910.
+# Validated by hand first; then served via GitOps (CRS → host-mgmt's ArgoCD).
 apiVersion: cluster.x-k8s.io/v1beta1
 kind: Cluster
 metadata:
   name: mgmt-child
   namespace: default
   labels:
-    # host-mgmt trata a mgmt-child como un REGIONAL: su CAAPH le instala ArgoCD (selector role=regional)
-    # y su CRS le siembra el region-root (selector region=mc-euw1). Espeja el modelo del Root un nivel abajo.
+    # host-mgmt treats mgmt-child as a REGIONAL: its CAAPH installs ArgoCD (selector role=regional)
+    # and its CRS seeds the region-root (selector region=mc-euw1). Mirrors the Root model one rung down.
     platform.idp/role: regional
     platform.idp/region: mc-euw1
-    cni: calico-vxlan        # el CRS calico-vxlan-cni (que el ArgoCD de host-mgmt crea en su ns default) lo matchea y le siembra el CNI
+    cni: calico-vxlan        # the calico-vxlan-cni CRS (created by host-mgmt's ArgoCD in its default ns) matches this and seeds the CNI
 spec:
   clusterNetwork:
     pods:
@@ -32,7 +32,7 @@ metadata:
   name: mgmt-child
   namespace: default
 spec:
-  infraClusterSecretRef:            # ← external-infra: las VMs se crean en el Root (no en host-mgmt)
+  infraClusterSecretRef:            # ← external-infra: the VMs are created on the Root (not on host-mgmt)
     apiVersion: v1
     kind: Secret
     name: mgmt-child-infra
@@ -75,12 +75,12 @@ spec:
     spec:
       virtualMachineTemplate:
         metadata:
-          namespace: mgmt-child           # ns en el Root donde viven las VMs (el del SA/RBAC)
+          namespace: mgmt-child           # ns on the Root where the VMs live (the SA/RBAC one)
         spec:
           runStrategy: Always
-          # Disco = DataVolume (CDI importa la cloud-image a un PVC de Longhorn 30Gi). Reemplaza el
-          # containerDisk efímero (~3Gi) que daba disk-pressure y evictaba los pods del vcluster del hijo.
-          # Mismo patrón que la composición Crossplane de los host clusters. CAPK prefija el DV por-máquina.
+          # Disk = DataVolume (CDI imports the cloud image into a 30Gi Longhorn PVC). Replaces the
+          # ephemeral containerDisk (~3Gi) that caused disk-pressure and evicted the child's vcluster pods.
+          # Same pattern as the host clusters' Crossplane composition. CAPK prefixes the DV per machine.
           dataVolumeTemplates:
             - metadata: { name: boot-volume }
               spec:
@@ -100,8 +100,8 @@ spec:
                 devices:
                   disks:
                     - { name: dv-volume, disk: { bus: virtio } }
-                  # SIN interfaces/networks custom: CAPK usa su default (bridge → IP única del pod por VM).
-                  # Si forzás masquerade, TODOS los nodos quedan con 10.0.2.2 → colisión → calico no rutea.
+                  # NO custom interfaces/networks: CAPK uses its default (bridge → unique pod IP per VM).
+                  # Forcing masquerade puts ALL nodes on 10.0.2.2 → collision → calico can't route.
               evictionStrategy: External
               nodeSelector: { kubernetes.io/hostname: srv-t7910 }
               volumes:
@@ -145,9 +145,9 @@ spec:
           namespace: mgmt-child
         spec:
           runStrategy: Always
-          # Disco = DataVolume (CDI importa la cloud-image a un PVC de Longhorn 30Gi). Reemplaza el
-          # containerDisk efímero (~3Gi) que daba disk-pressure y evictaba los pods del vcluster del hijo.
-          # Mismo patrón que la composición Crossplane de los host clusters. CAPK prefija el DV por-máquina.
+          # Disk = DataVolume (CDI imports the cloud image into a 30Gi Longhorn PVC). Replaces the
+          # ephemeral containerDisk (~3Gi) that caused disk-pressure and evicted the child's vcluster pods.
+          # Same pattern as the host clusters' Crossplane composition. CAPK prefixes the DV per machine.
           dataVolumeTemplates:
             - metadata: { name: boot-volume }
               spec:
@@ -167,8 +167,8 @@ spec:
                 devices:
                   disks:
                     - { name: dv-volume, disk: { bus: virtio } }
-                  # SIN interfaces/networks custom: CAPK usa su default (bridge → IP única del pod por VM).
-                  # Si forzás masquerade, TODOS los nodos quedan con 10.0.2.2 → colisión → calico no rutea.
+                  # NO custom interfaces/networks: CAPK uses its default (bridge → unique pod IP per VM).
+                  # Forcing masquerade puts ALL nodes on 10.0.2.2 → collision → calico can't route.
               evictionStrategy: External
               nodeSelector: { kubernetes.io/hostname: srv-t7910 }
               volumes:

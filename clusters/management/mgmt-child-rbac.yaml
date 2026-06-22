@@ -1,7 +1,7 @@
-# Fase 2 — acceso "external-infra" del CAPK de host-mgmt al KubeVirt del Root.
-# El CAPK que corre EN host-mgmt usa este SA (vía un kubeconfig) para crear las VMs del cluster hijo
-# en ESTE cluster (el Root), namespace mgmt-child. Scope mínimo: KubeVirt VMs/VMIs + CDI DataVolumes +
-# Services/Secrets/PVCs en mgmt-child. (El kubeconfig con el token NO va en git — se crea one-off.)
+# Phase 2 — "external-infra" access for host-mgmt's CAPK to the Root's KubeVirt.
+# The CAPK running IN host-mgmt uses this SA (via a kubeconfig) to create the child cluster's VMs
+# in THIS cluster (the Root), namespace mgmt-child. Minimal scope: KubeVirt VMs/VMIs + CDI DataVolumes +
+# Services/Secrets/PVCs in mgmt-child. (The kubeconfig with the token is NOT in git — created one-off.)
 apiVersion: v1
 kind: Namespace
 metadata:

@@ -1,9 +1,9 @@
-# cert-manager = SERVICIO DE PLATAFORMA del fleet: se instala en TODOS los clusters (management Y
-# regional/host), igual que ArgoCD. Lo usan: el management para el webhook del CAPI operator (Certificates),
-# y los regional/host para el TLS de los Gateways de sus tenants. Va por separado (no como subchart del CAPI
-# operator) porque el operator templatea su propio Certificate y necesita los CRDs de cert-manager YA
-# registrados; si van en el mismo release, race ("no matches for kind Certificate"). CAAPH reintenta el
-# operator hasta que cert-manager esté listo.
+# cert-manager = a fleet PLATFORM SERVICE: installed in ALL clusters (management AND regional/host),
+# like ArgoCD. Used by: the management for the CAPI operator's webhook (Certificates), and the
+# regional/host clusters for their tenants' Gateway TLS. Installed separately (not as a subchart of the CAPI
+# operator) because the operator templates its own Certificate and needs cert-manager's CRDs ALREADY
+# registered; in the same release that races ("no matches for kind Certificate"). CAAPH retries the
+# operator until cert-manager is ready.
 apiVersion: addons.cluster.x-k8s.io/v1alpha1
 kind: HelmChartProxy
 metadata:
@@ -25,4 +25,4 @@ spec:
     wait: true
   valuesTemplate: |
     crds:
-      enabled: true     # instala los CRDs de cert-manager (Certificate, Issuer, etc.)
+      enabled: true     # installs cert-manager's CRDs (Certificate, Issuer, etc.)

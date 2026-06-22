@@ -1,30 +1,30 @@
-# fleet-management (path clusters/management) lo renderiza con kustomize:
-#   - el HelmChartProxy que instala ArgoCD en los clusters role=management
-#   - el ClusterResourceSet que siembra el region-root de eu-west1
-#   - un ConfigMap (region-root-eu-west1) cuyo contenido ES el Application region-root
-# region-root-eu-west1.yaml NO se aplica directo (kustomize lo consume como dato del generator),
-# así el region-root sólo se inyecta en el cluster regional vía el CRS, no en el management.
+# fleet-management (path clusters/management) is rendered with kustomize:
+#   - the HelmChartProxy that installs ArgoCD on role=management clusters
+#   - the ClusterResourceSet that seeds the eu-west1 region-root
+#   - a ConfigMap (region-root-eu-west1) whose content IS the region-root Application
+# region-root-eu-west1.yaml is NOT applied directly (kustomize consumes it as generator data),
+# so the region-root is only injected into the regional cluster via the CRS, not the management.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: fleet
 resources:
-  - helmchartproxy-argocd.yaml        # CAAPH → ArgoCD en role in (management,regional)
-  - helmchartproxy-certmanager.yaml   # CAAPH → cert-manager en role=management (prereq del CAPI operator)
-  - helmchartproxy-capi.yaml          # CAAPH → CAPI en role=management (Fase 2: host-mgmt crea clusters)
+  - helmchartproxy-argocd.yaml        # CAAPH → ArgoCD on role in (management,regional)
+  - helmchartproxy-certmanager.yaml   # CAAPH → cert-manager on role in (management,regional) (CAPI operator prereq)
+  - helmchartproxy-capi.yaml          # CAAPH → CAPI on role=management (Phase 2: host-mgmt creates clusters)
   - region-root-crs.yaml
-  - mgmt-child-rbac.yaml              # Fase 2: SA+RBAC en el Root para el external-infra del CAPK de host-mgmt
-  - mgmt-child-infra-job.yaml         # Fase 2: CronJob que crea el secret kubeconfig en host-mgmt (credencial)
-  - mgmt-child-crs.yaml               # Fase 2: siembra los manifests del child en host-mgmt
-  - mgmt-child-addons-crs.yaml        # Fase 3: siembra ArgoCD+region-root del child en host-mgmt (recursión)
+  - mgmt-child-rbac.yaml              # Phase 2: SA+RBAC on the Root for host-mgmt's CAPK external-infra
+  - mgmt-child-infra-job.yaml         # Phase 2: CronJob that creates the kubeconfig secret in host-mgmt (the credential)
+  - mgmt-child-crs.yaml               # Phase 2: seeds the child manifests into host-mgmt
+  - mgmt-child-addons-crs.yaml        # Phase 3: seeds the child's ArgoCD+region-root into host-mgmt (recursion)
 configMapGenerator:
   - name: region-root-eu-west1
     files:
       - region-root-eu-west1.yaml
-  - name: mgmt-child-cluster          # los manifests del child (los aplica el CRS en host-mgmt, NO en el Root)
+  - name: mgmt-child-cluster          # the child manifests (applied by the CRS in host-mgmt, NOT on the Root)
     files:
       - mgmt-child-cluster.yaml
-  - name: mgmt-child-addons           # ArgoCD+region-root del child (los aplica el CRS en host-mgmt)
+  - name: mgmt-child-addons           # the child's ArgoCD+region-root (applied by the CRS in host-mgmt)
     files:
       - mgmt-child-addons.yaml
 generatorOptions:
-  disableNameSuffixHash: true   # el CRS referencia el ConfigMap por nombre exacto
+  disableNameSuffixHash: true   # the CRS references the ConfigMap by its exact name
