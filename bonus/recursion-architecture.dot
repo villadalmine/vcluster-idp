@@ -1,0 +1,28 @@
+digraph G {
+  rankdir=TB; bgcolor="white"; pad=0.4; nodesep=0.5; ranksep=1.0;
+  fontname="Helvetica"; fontsize=20; labelloc=t;
+  label=<<b>Management-of-managements</b><br/>a cluster that <b>creates AND serves</b> its own child — the same GitOps pattern, one rung down>;
+  node [fontname="Helvetica", shape=box, style="rounded,filled", fontsize=12, margin="0.22,0.12"];
+  edge [fontname="Helvetica", fontsize=11, color="#5e35b1", penwidth=1.6];
+
+  root [label=<<b>Root</b> — k3s, bare metal<br/>Crossplane + Cluster API + KubeVirt + central ArgoCD<br/><font color="#666">role: management <b>and</b> hypervisor</font>>,
+        fillcolor="#e3f2fd", color="#1976d2"];
+  hm [label=<<b>host-mgmt</b> — role = management<br/>nodes = KubeVirt VMs on Root<br/>runs its <b>OWN</b> Cluster API + CAAPH + ArgoCD>,
+        fillcolor="#ede7f6", color="#5e35b1"];
+  mc [label=<<b>mgmt-child</b> — workload cluster<br/>VMs on Root's KubeVirt (external-infra)<br/>got its <b>OWN</b> ArgoCD + region-root + CNI <i>from host-mgmt</i>>,
+        fillcolor="#e8f5e9", color="#2e7d32"];
+  tz [label=<<b>vcluster-tenant-z</b><br/>Postgres + API + Web>, fillcolor="#fff3e0", color="#ef6c00"];
+
+  root -> hm [label="  CAPI creates the cluster\l  + seeds ArgoCD via CRS\l"];
+  hm   -> mc [label="  CAPI creates the child\l  + delivers ArgoCD / region-root / CNI\l"];
+  mc   -> tz [label="  its ArgoCD provisions\l  the tenant vCluster\l"];
+
+  note [shape=note, fillcolor="#fffde7", color="#fbc02d", fontsize=11, label=<
+    <b>Why it matters</b><br align="left"/>
+    Same verb at every level: <b>declare in Git → a controller reconciles</b>.<br align="left"/>
+    Each cluster runs its own ArgoCD → <b>no central control-plane SPOF</b>.<br align="left"/>
+    Whole chain validated <b>clean-room</b>: torn down in reverse, rebuilt 100% from Git.<br align="left"/>
+  >];
+  { rank=same; hm; note; }
+  hm -> note [style=invis];
+}
