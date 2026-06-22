@@ -1,8 +1,0 @@
-{"version":3,"term":{"cols":80,"rows":24,"type":"xterm-kitty"},"timestamp":1782088927,"command":"./cli/platform tenant-demo create --api-version 2.23.1 --web-version 1.27-alpine","env":{"SHELL":"/bin/bash"}}
-[0.012251, "o", "\u001b[1;34m▶\u001b[0m Tenant 'tenant-demo' (env=dev) → writing source of truth\r\n"]
-[0.005129, "o", "\u001b[1;32m✔\u001b[0m tenants/dev/tenant-demo.yaml written\r\n"]
-[0.015165, "o", "\u001b[1;32m✔\u001b[0m GitOps commit created — ArgoCD will reconcile the ApplicationSets\r\n"]
-[0.000938, "o", "\u001b[1;34m▶\u001b[0m forcing ApplicationSets refresh…\r\n"]
-[0.094904, "o", "\r\n"]
-[0.000842, "o", "\u001b[1;34m▶\u001b[0m verify with: platform tenant-demo status\r\n"]
-[0.000437, "x", "0"]

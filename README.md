@@ -141,39 +141,45 @@ Real, live terminal recordings (asciinema) — click to play:
 <table align="center">
   <tr>
     <td align="center" width="25%">
-      <b>1. Tenant Provisioning</b><br/>
-      <a href="https://asciinema.org/a/mQjTa1coPCb8V8RM" target="_blank">
-        <img src="https://asciinema.org/img/play-button.png" width="80" alt="Tenant Provisioning"/>
+      <b>1. Add a Tenant</b><br/>
+      <a href="https://asciinema.org/a/deIAZiSuxuB8RAo6" target="_blank">
+        <img src="https://asciinema.org/img/play-button.png" width="80" alt="Add a Tenant"/>
       </a>
     </td>
     <td align="center" width="25%">
-      <b>2. Tenant Validation</b><br/>
+      <b>2. Delete a Tenant</b><br/>
+      <a href="https://asciinema.org/a/Wd5gdGCF5PMgcXVA" target="_blank">
+        <img src="https://asciinema.org/img/play-button.png" width="80" alt="Delete a Tenant"/>
+      </a>
+    </td>
+    <td align="center" width="25%">
+      <b>3. Tenant Validation</b><br/>
       <a href="https://asciinema.org/a/OPuNETxXnTwzKVhT" target="_blank">
         <img src="https://asciinema.org/img/play-button.png" width="80" alt="Tenant Validation"/>
       </a>
     </td>
     <td align="center" width="25%">
-      <b>3. Full Platform Showcase</b><br/>
+      <b>4. Full Platform Showcase</b><br/>
       <a href="https://asciinema.org/a/lr5tg4GWV8KK5tF6" target="_blank">
         <img src="https://asciinema.org/img/play-button.png" width="80" alt="Platform Showcase"/>
-      </a>
-    </td>
-    <td align="center" width="25%">
-      <b>4. Topology & Hierarchy</b><br/>
-      <a href="https://asciinema.org/a/w2oxEgyacAJSRDQI" target="_blank">
-        <img src="https://asciinema.org/img/play-button.png" width="80" alt="Topology Showcase"/>
       </a>
     </td>
   </tr>
   <tr>
     <td align="center" width="25%">
-      <b>5. Fleet Inspection (fleet-test)</b><br/>
+      <b>5. Topology &amp; Hierarchy</b><br/>
+      <a href="https://asciinema.org/a/w2oxEgyacAJSRDQI" target="_blank">
+        <img src="https://asciinema.org/img/play-button.png" width="80" alt="Topology Showcase"/>
+      </a>
+    </td>
+    <td align="center" width="25%">
+      <b>6. Fleet Inspection (fleet-test)</b><br/>
       <a href="https://asciinema.org/a/LRxKPe9RE8adnPwV" target="_blank">
         <img src="https://asciinema.org/img/play-button.png" width="80" alt="Fleet Inspection"/>
       </a>
     </td>
     <td align="center" width="25%">
-      <b>6. vClusters Detail (vc-info)</b><br/>
+      <b>7. vClusters Detail (vc-info)</b><br/>
       <a href="https://asciinema.org/a/Q6oTIeH31tHCaIXv" target="_blank">
         <img src="https://asciinema.org/img/play-button.png" width="80" alt="vClusters Detail"/>
       </a>
@@ -182,12 +188,13 @@ Real, live terminal recordings (asciinema) — click to play:
 </table>
 
 What each recording shows (one line each):
-1. **Tenant Provisioning** — `cli/platform create` writes the tenant to Git; ArgoCD provisions the vCluster + workload.
-2. **Tenant Validation** — `cli/validate` runs the functional checks against a live tenant.
-3. **Full Platform Showcase** — `cli/showcase-platform`: read-only tour (KubeVirt, Crossplane, CAPI, ArgoCD, vCluster isolation, Gateway/TLS).
-4. **Topology & Hierarchy** — `cli/showcase-topology`: the topology models live, including the recursion (`host-mgmt → mgmt-child`).
-5. **Fleet Inspection** — `cli/showcase-fleet`: reaching the created host clusters via jump pods (VM→node placement, per-layer health, each cluster's ArgoCD + vClusters).
-6. **vClusters Detail** — `cli/fleet-test vc-info`: a rich card per vCluster across the fleet — where it comes from (Git source + domain), its ArgoCD apps, what runs in it, what it exposes (HTTPRoute), and how to operate it (kubeconfig).
+1. **Add a Tenant** — `cli/platform create` commits the tenant to Git; ArgoCD provisions the vCluster, the `vcluster-register` CronJob auto-registers it, and the workload converges — fully hands-off.
+2. **Delete a Tenant** — `cli/platform delete` removes the Git source; ArgoCD prunes the Apps and the register CronJob's GC reconciles the teardown (namespace, PVC and registration gone, no leftovers).
+3. **Tenant Validation** — `cli/validate` runs the functional checks against a live tenant.
+4. **Full Platform Showcase** — `cli/showcase-platform`: read-only tour (KubeVirt, Crossplane, CAPI, ArgoCD, vCluster isolation, Gateway/TLS).
+5. **Topology & Hierarchy** — `cli/showcase-topology`: the topology models live, including the recursion (`host-mgmt -> mgmt-child`).
+6. **Fleet Inspection** — `cli/showcase-fleet`: reaching the created host clusters via jump pods (VM->node placement, per-layer health, each cluster's ArgoCD + vClusters).
+7. **vClusters Detail** — `cli/fleet-test vc-info`: a rich card per vCluster across the fleet — Git source + domain, its ArgoCD apps, what runs in it, what it exposes (HTTPRoute), and how to operate it (kubeconfig).
 
 ### 📄 Full Read-Only Validation Output (Text Version)
 If the terminal recording scrolls too quickly, you can expand these sections to read the exact text output:
