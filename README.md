@@ -172,6 +172,12 @@ Real, live terminal recordings (asciinema) — click to play:
         <img src="https://asciinema.org/img/play-button.png" width="80" alt="Fleet Inspection"/>
       </a>
     </td>
+    <td align="center" width="25%">
+      <b>6. vClusters Detail (vc-info)</b><br/>
+      <a href="https://asciinema.org/a/Q6oTIeH31tHCaIXv" target="_blank">
+        <img src="https://asciinema.org/img/play-button.png" width="80" alt="vClusters Detail"/>
+      </a>
+    </td>
   </tr>
 </table>
 
@@ -181,6 +187,7 @@ What each recording shows (one line each):
 3. **Full Platform Showcase** — `cli/showcase-platform`: read-only tour (KubeVirt, Crossplane, CAPI, ArgoCD, vCluster isolation, Gateway/TLS).
 4. **Topology & Hierarchy** — `cli/showcase-topology`: the topology models live, including the recursion (`host-mgmt → mgmt-child`).
 5. **Fleet Inspection** — `cli/showcase-fleet`: reaching the created host clusters via jump pods (VM→node placement, per-layer health, each cluster's ArgoCD + vClusters).
+6. **vClusters Detail** — `cli/fleet-test vc-info`: a rich card per vCluster across the fleet — where it comes from (Git source + domain), its ArgoCD apps, what runs in it, what it exposes (HTTPRoute), and how to operate it (kubeconfig).
 
 ### 📄 Full Read-Only Validation Output (Text Version)
 If the terminal recording scrolls too quickly, you can expand these sections to read the exact text output:
