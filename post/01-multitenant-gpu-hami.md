@@ -41,6 +41,154 @@ bash bonus/gpu-3tenant.sh
 dot -Tpng -Gdpi=140 bonus/gpu-architecture.dot -o bonus/gpu-architecture.png
 ```
 
+## Video transcripts (text)
+
+<details>
+<summary><b>Cinematic — 3 tenants &middot; 2 GPUs &middot; 3 stories</b> (click to expand)</summary>
+
+```text
+━━ 3 tenants · 2 bare-metal GPUs · 3 local LLMs — HAMi vGPU + vCluster + Ollama ━━
+
+tenant-a / -b / -c each run Ollama INSIDE their own vCluster, each with 2 vGPU (a slice of
+EACH physical card). HAMi hard-caps + isolates them; the three share the same 2 bare-metal GPUs.
+Stack: bare-metal GPUs -> HAMi (software vGPU, no MIG/passthrough) -> vCluster -> Ollama (llama3.2).
+
+━━ Governance — the 3 tenants sharing 2 physical cards (Tesla P4 + Quadro M4000) ━━
+
+GPU budget granted per tenant (2 vGPU each = one slice per card, hard-capped):
+  TENANT (vCluster)           vGPU   VRAM(MiB)   CORES
+  tenant-a-dev                   2        4000     40%
+  tenant-b-dev                   2        4000     40%
+  tenant-c-dev                   2        4000     40%
+
+━━ Tenant-a  ·  love story ━━
+
+Its Ollama pod spans BOTH physical cards (the model is loaded on each slice):
+    Quadro M4000, 919 MiB, 2000 MiB
+    Tesla P4, 975 MiB, 2000 MiB
+  > tenant-a asks its local LLM for a love story about Kubernetes...
+
+  In the bustling cloud of Kubernetes, Podina and Nodey found themselves stuck in a
+  scheduling loop - they kept trying to start each other, only to get restarted by their
+  human overlords. As they danced around the cluster, their labels became increasingly
+  tangled in a web of code and desire. One day, Podina decided to "scale" her feelings, but
+  Nodey was having none of it - he shut down on her advances, leaving her to wonder if she
+  was just a label that would "stick" to someone else's schedule. Eventually, they both
+  learned to "reboot" their love lives and found happiness in the Kubernetes ecosystem.
+
+━━ Tenant-b  ·  heist ━━
+
+Its Ollama pod spans BOTH physical cards (the model is loaded on each slice):
+    Quadro M4000, 919 MiB, 2000 MiB
+    Tesla P4, 975 MiB, 2000 MiB
+  > tenant-b asks its local LLM for a heist about Kubernetes...
+
+  In a brazen heist, a pod and its sidecar snuck into the etcd vault like a swarm of bees
+  on a mission to uncover a secret that would make Kubernetes' own self-healing
+  capabilities jealous. The pair dodged security cameras with ease, their containerized
+  agility allowing them to evade detection and reach the coveted payload. As they cracked
+  the code to the Secret, one pod exclaimed, "We've got Kubernetes-iously secured!" But
+  little did they know, their mischief was about to get etched into the vault's logs
+  forever, leaving a digital footprint that would make even the most hardened security
+  expert scratch their head in confusion.
+
+━━ Tenant-c  ·  noir mystery ━━
+
+Its Ollama pod spans BOTH physical cards (the model is loaded on each slice):
+    Quadro M4000, 919 MiB, 2000 MiB
+    Tesla P4, 975 MiB, 2000 MiB
+  > tenant-c asks its local LLM for a noir mystery about Kubernetes...
+
+  In the dimly lit alleys of New Haven, Detective Jack "The Docker" Murphy was on a mission
+  to track down the culprit behind the outbreak of OOMs (Over-Outer-Memory) in the city's
+  critical infrastructure. As he navigated the crowded streets in his trusty Pod, he
+  muttered to himself, "This is a bug in the system - someone needs to shut it down." With
+  his vast knowledge of Kubernetes and a keen eye for patterns, Murphy had been tracking a
+  lead on a mysterious pod operator who seemed to be running amok, leaving a trail of
+  failed applications and corrupted data in their wake. As he closed in on his suspect, he
+  quipped, "It's time to containerize the evidence - this guy's going down."
+
+━━ 3 isolated tenants · 2 bare-metal GPUs · 3 local LLMs · all hard-capped & sliced by HAMi ━━
+```
+
+</details>
+
+<details>
+<summary><b>GPU deep-dive — slicing &middot; governance &middot; metrics &middot; over-budget Pending &middot; multi-GPU &middot; LLM</b> (click to expand)</summary>
+
+```text
+━━ BONUS — Multi-tenant GPU on bare metal: HAMi vGPU (slicing, metrics, governance, multi-GPU) ━━
+
+2 physical GPUs on srv-t7910 -> HAMi slices them in software (no MIG, no passthrough) with HARD
+VRAM + compute limits -> each tenant/workload gets isolated, capped, measured slices.
+
+━━ 1/7  The bare-metal GPUs (la GPU del fierro) ━━
+
+  node srv-t7910 advertises nvidia.com/gpu = 20   (Tesla P4 7680MiB + Quadro M4000 8192MiB)
+
+━━ 2/7  GOVERNANCE — the GPU budget granted per tenant / namespace ━━
+
+What each tenant is ALLOWED (hard caps in the pod spec) — the showback / quota view:
+  NAMESPACE / TENANT          vGPU   VRAM(MiB)   CORES
+  ai                             1        6000     80%
+  gpu-test                       3       14000     80%
+  vcluster-tenant-a-dev          1        1500     15%
+
+━━ 3/7  A TENANT's HARD-capped slice (inside its own vCluster) ━━
+
+nvidia-smi from a pod INSIDE vcluster-tenant-a-dev — it sees ONLY its slice of an 8GB card:
+  |   0  Quadro M4000                   Off |   00000000:03:00.0 Off |                  N/A |
+  | 47%   44C    P8             22W /  120W |       0MiB /   1500MiB |      0%      Default |
+  -> capped to 1500MiB. The tenant cannot see or exceed its slice (hard isolation).
+
+━━ 4/7  METRICS — HAMi vGPU telemetry per tenant (the dashboard, in text) ━━
+
+  TENANT (namespace)           LIMIT(MiB)    USED(MiB)
+  gpu-test                           6000         2052
+  vcluster-tenant-a-dev              1500            0
+  physical cards:
+    NVIDIA-Quadro M4000 used = 1304 MiB
+    NVIDIA-Tesla P4 used = 1173 MiB
+  (source: hami_vgpu_memory_limit/used_bytes -> Prometheus + Grafana on the cluster)
+
+━━ 5/7  GOVERNANCE enforcement — an over-budget request is rejected (Pending) ━━
+
+A tenant asks for 8000MiB (more than any card can give). The scheduler refuses to overcommit:
+  NAME         READY   STATUS    RESTARTS   AGE     IP       NODE     NOMINATED NODE   READINESS GATES
+  gpu-greedy   0/1     Pending   0          6m44s   <none>   <none>   <none>           <none>
+  reason: CardInsufficientMemory(srv-t7910)
+  -> it stays Pending; it cannot starve the tenants that already hold their slices.
+
+━━ 6/7  MULTI-GPU — one pod (Ollama) spanning BOTH physical cards ━━
+
+Ollama got 2 vGPU (one slice per card, capped 3000MiB each) and spread the model across both:
+  index, name, memory.used [MiB], memory.total [MiB]
+  0, Quadro M4000, 963 MiB, 3000 MiB
+  1, Tesla P4, 1090 MiB, 3000 MiB
+  NAME           ID              SIZE      PROCESSOR    CONTEXT    UNTIL
+  llama3.2:1b    baf6a787fdff    2.1 GB    100% GPU     4096       3 minutes from now
+  -> the model uses VRAM on BOTH the M4000 and the P4, each within its HAMi cap.
+
+━━ 7/7  Ask the LLM (inference live across the sliced GPUs) ━━
+
+Prompt: "Write a short, funny love story between two Kubernetes pods."
+
+  In the bustling Kubernetes ecosystem, "Pod" Morgan and "Node" Nora locked eyes at the Node
+  Manager's conference, where they quickly realized their label was meant to be: "Scheduling
+  Sweethearts". As they danced around each other in the pods' designated area, they couldn't
+  help but restart their love affair with regular meetings and scheduled dates. But little
+  did they know, a rogue Container (aka "Docker") had been trying to sabotage their romance
+  by deploying its own pod-like nemesis – a malicious image labeled as "Malicious". Just when
+  all hope seemed lost, Morgan and Nora's pods were scheduled for a "deployment" of love, and
+  they refused to be restarted.
+
+━━ Real cards -> HAMi-sliced -> hard-capped, measured, quota-enforced, multi-GPU -> live LLM. ━━
+
+0
+```
+
+</details>
+
 ---
 
 ## Version EN (copy-paste)
