@@ -142,25 +142,25 @@ Real, live terminal recordings (asciinema) — click to play:
   <tr>
     <td align="center" width="25%">
       <b>1. Tenant Provisioning</b><br/>
-      <a href="https://asciinema.org/a/ha0577C30eV22PwJ" target="_blank">
+      <a href="https://asciinema.org/a/UdbQ4LQtlxruy9WH" target="_blank">
         <img src="https://asciinema.org/img/play-button.png" width="80" alt="Tenant Provisioning"/>
       </a>
     </td>
     <td align="center" width="25%">
       <b>2. Tenant Validation</b><br/>
-      <a href="https://asciinema.org/a/KbTlRvky9mGqSoo9" target="_blank">
+      <a href="https://asciinema.org/a/OPuNETxXnTwzKVhT" target="_blank">
         <img src="https://asciinema.org/img/play-button.png" width="80" alt="Tenant Validation"/>
       </a>
     </td>
     <td align="center" width="25%">
       <b>3. Full Platform Showcase</b><br/>
-      <a href="https://asciinema.org/a/6410kw90e19yRbU2" target="_blank">
+      <a href="https://asciinema.org/a/lr5tg4GWV8KK5tF6" target="_blank">
         <img src="https://asciinema.org/img/play-button.png" width="80" alt="Platform Showcase"/>
       </a>
     </td>
     <td align="center" width="25%">
       <b>4. Topology & Hierarchy</b><br/>
-      <a href="https://asciinema.org/a/UrysCfqUb5KQi5p8" target="_blank">
+      <a href="https://asciinema.org/a/w2oxEgyacAJSRDQI" target="_blank">
         <img src="https://asciinema.org/img/play-button.png" width="80" alt="Topology Showcase"/>
       </a>
     </td>
@@ -168,7 +168,7 @@ Real, live terminal recordings (asciinema) — click to play:
   <tr>
     <td align="center" width="25%">
       <b>5. Fleet Inspection (fleet-test)</b><br/>
-      <a href="https://asciinema.org/a/7JXZyO63tSqVxQoK" target="_blank">
+      <a href="https://asciinema.org/a/LRxKPe9RE8adnPwV" target="_blank">
         <img src="https://asciinema.org/img/play-button.png" width="80" alt="Fleet Inspection"/>
       </a>
     </td>

@@ -1,0 +1,8 @@
+{"version":3,"term":{"cols":80,"rows":24,"type":"xterm-kitty"},"timestamp":1782088424,"command":"./cli/platform tenant-a create --api-version 2.23.1 --web-version 1.27-alpine","env":{"SHELL":"/bin/bash"}}
+[0.008752, "o", "\u001b[1;34m▶\u001b[0m Tenant 'tenant-a' (env=dev) → writing source of truth\r\n"]
+[0.00765, "o", "\u001b[1;32m✔\u001b[0m tenants/dev/tenant-a.yaml written\r\n"]
+[0.016993, "o", "\u001b[1;33m⚠\u001b[0m nothing to commit (idempotent)\r\n"]
+[0.000978, "o", "\u001b[1;34m▶\u001b[0m forcing ApplicationSets refresh…\r\n"]
+[0.131132, "o", "\r\n"]
+[0.000891, "o", "\u001b[1;34m▶\u001b[0m verify with: platform tenant-a status\r\n"]
+[0.000369, "x", "0"]
