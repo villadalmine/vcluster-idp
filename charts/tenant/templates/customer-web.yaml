@@ -1,4 +1,4 @@
-# --- customer-web (requirement 3): web app = nginx --------------------------
+# --- customer-web: web app = nginx --------------------------
 # Version selectable via image tag (.Values.applications.web.version).
 apiVersion: apps/v1
 kind: Deployment

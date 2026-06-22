@@ -25,7 +25,7 @@ spec:
         files:
           - path: "tenants/**/*.yaml"
         # Detect new/changed tenant files fast (default 180s) — no webhook needed
-        # (homelab: GitHub can't reach the internal ArgoCD). Prod: webhook (ADR-15).
+        # (homelab: GitHub can't reach the internal ArgoCD). Prod: webhook.
         requeueAfterSeconds: 30
   template:
     metadata:
@@ -69,7 +69,7 @@ spec:
         name: "vcluster-{{.tenant.name}}-{{.tenant.environment}}"
         namespace: "{{.tenant.name}}"
       # The Postgres Secret uses Helm `lookup` to keep the password stable, but under
-      # ArgoCD `lookup` returns empty during diff → false drift (ADR-07). Ignore the
+      # ArgoCD `lookup` returns empty during diff → false drift. Ignore the
       # Secret data so Argo neither flags it OutOfSync nor overwrites the live password
       # (with RespectIgnoreDifferences=true the live data is preserved).
       ignoreDifferences:
@@ -83,7 +83,7 @@ spec:
         syncOptions:
           - CreateNamespace=true
           - RespectIgnoreDifferences=true   # official docs: required with CRDs/controllers
-          # Second failure-handling tag (ADR-08): lets the first sync not fail in
+          # Second failure-handling tag: lets the first sync not fail in
           # dry-run when a resource in one wave depends on a CRD created by an
           # earlier wave (e.g. custom resources inside the vCluster).
           - SkipDryRunOnMissingResource=true

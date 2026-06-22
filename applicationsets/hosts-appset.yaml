@@ -25,7 +25,7 @@ spec:
           - path: "tenants/**/*.yaml"
         # Poll interval to detect new/changed tenant files (default 180s). Lowering it
         # kills propagation latency WITHOUT a webhook — needed in a homelab where GitHub
-        # can't reach the internal ArgoCD. Production: Git webhook → instant (ADR-15).
+        # can't reach the internal ArgoCD. Production: Git webhook → instant.
         requeueAfterSeconds: 30
   template:
     metadata:
@@ -55,14 +55,14 @@ spec:
       syncPolicy:
         automated:
           prune: true
-          selfHeal: true       # native drift detection (ADR-12)
+          selfHeal: true       # native drift detection
         syncOptions:
           - CreateNamespace=true
           # Required on the first sync: registering vClusters/Platform installs its
           # own Cluster CRD, and without this the dry-run fails and the Application
-          # never syncs (ADR-08).
+          # never syncs.
           - SkipDryRunOnMissingResource=true
-        # ── Failure handling (ADR-08): retries with backoff ──
+        # ── Failure handling: retries with backoff ──
         retry:
           limit: 5
           backoff:

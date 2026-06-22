@@ -2,7 +2,7 @@
 # CODE + ADR (does NOT run in the dev-single demo). Shows how the management cluster
 # bootstraps GitOps on every cluster CAPI creates WITHOUT a central ArgoCD: the CRS
 # applies these manifests ONCE to clusters matching the label, then each cluster's
-# own ArgoCD self-manages from Git (ADR-13). No hub-and-spoke.
+# own ArgoCD self-manages from Git. No hub-and-spoke.
 ---
 apiVersion: addons.cluster.x-k8s.io/v1beta1
 kind: ClusterResourceSet

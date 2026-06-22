@@ -1,4 +1,4 @@
-# Per-container defaults (requirement 6): avoids pods without requests/limits.
+# Per-container defaults: avoids pods without requests/limits.
 apiVersion: v1
 kind: LimitRange
 metadata:

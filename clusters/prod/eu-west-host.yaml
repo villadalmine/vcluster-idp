@@ -1,8 +1,8 @@
 # ═══ LAYER 1 — CAPI: HOST CLUSTER provisioning (CODE + ADR, DOES NOT RUN) ════
 # Declaratively defines an RKE2 host cluster. In the demo the host is provided by
-# kind/k3d; this shows HOW the fleet is provisioned in production (ADR-04/05).
+# kind/k3d; this shows HOW the fleet is provisioned in production.
 #
-# RKE2 chosen for CIS + FIPS hardening — key for sovereignty/regulated (Nebul).
+# RKE2 chosen for CIS + FIPS hardening — key for sovereignty/regulated.
 # Example provider: Docker (CAPD) for local reproducibility; in prod it would be
 # a real infra provider (vSphere, Metal3, cloud).
 ---
@@ -35,11 +35,11 @@ metadata:
   name: host-prod-eu-west-cp
   namespace: capi-prod
 spec:
-  replicas: 3                      # HA: multi-node control plane (etcd quorum) — ADR-11
+  replicas: 3                      # HA: multi-node control plane (etcd quorum)
   version: v1.31.2+rke2r1
   serverConfig:
-    cni: cilium                    # Cilium for NetworkPolicy (ADR-06)
-    profile: cis                   # CIS hardening (ADR-05)
+    cni: cilium                    # Cilium for NetworkPolicy
+    profile: cis                   # CIS hardening
   machineTemplate:
     infrastructureRef:
       apiVersion: infrastructure.cluster.x-k8s.io/v1beta1

@@ -1,4 +1,4 @@
-# --- customer-api (requirement 3): demo API = httpbin -----------------------
+# --- customer-api: demo API = httpbin -----------------------
 # Version selectable via image tag (.Values.applications.api.version).
 apiVersion: apps/v1
 kind: Deployment

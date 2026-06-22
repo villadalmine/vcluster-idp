@@ -1,5 +1,5 @@
 {{- if .Values.isolation.enabled }}
-# Host-side network isolation (requirement 7) — CiliumNetworkPolicy.
+# Host-side network isolation — CiliumNetworkPolicy.
 # Enforced by Cilium on the HOST, where the vCluster-synced pods actually run (the
 # in-vCluster standard NetworkPolicy is not enforced there). Once this selects the
 # pods, Cilium default-denies ingress and only allows what's listed:

@@ -2,7 +2,7 @@ tenant:
   name: tenant-z
   environment: dev
   domain: mc-euw1.example.com
-  secretBackend: generated   # generated | eso (ADR-07)
+  secretBackend: generated   # generated | eso
 applications:
   api:
     version: "2.23.1"

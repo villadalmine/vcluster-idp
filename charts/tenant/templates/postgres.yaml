@@ -1,4 +1,4 @@
-# --- Dedicated PostgreSQL per tenant (requirement 3) ------------------------
+# --- Dedicated PostgreSQL per tenant ------------------------
 # StatefulSet with its own PVC. Credentials taken from the auto-generated Secret.
 apiVersion: apps/v1
 kind: StatefulSet

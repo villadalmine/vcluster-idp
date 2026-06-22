@@ -28,7 +28,7 @@ spec:
       # the vcluster-app deletes the vCluster and the workload with it — the wl-app finalizer would hang against the
       # already-deleted vCluster (dead destination). NOTE: the appset-controller IGNORES this finalizers:[] and forces
       # the resources-finalizer anyway; so the real safety-net is the vcluster-register CronJob's GC, which
-      # unsticks the hung wl-apps (removes the finalizer when the destination is no longer registered). See ADR-13.
+      # unsticks the hung wl-apps (removes the finalizer when the destination is no longer registered).
       finalizers: []
       labels:
         platform.idp/tenant: "{{.tenant.name}}"

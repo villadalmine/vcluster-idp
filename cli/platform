@@ -2,13 +2,13 @@
 # ═══════════════════════════════════════════════════════════════════════════
 # platform — IDP CLI (GitOps FACADE, not an imperative orchestrator)
 # ───────────────────────────────────────────────────────────────────────────
-# Syntax (PDF):    platform <tenant> <create|delete|status>
+# Syntax:    platform <tenant> <create|delete|status>
 # Alternate form:  platform create <tenant> [--api-version X] [--web-version Y] [--env E]
 #
 # Philosophy: `create` does NOT deploy imperatively. It writes/commits the file
 # tenants/<env>/<tenant>.yaml (the source of truth) and lets ArgoCD reconcile
 # via the two ApplicationSets. This gives idempotency and drift detection "for
-# free" (ADR-02/12). In a local environment with no remote, it falls back to a
+# free". In a local environment with no remote, it falls back to a
 # direct `kubectl apply` of the tenant so the demo runs end-to-end.
 # ═══════════════════════════════════════════════════════════════════════════
 set -euo pipefail
@@ -19,7 +19,7 @@ REGION="${PLATFORM_REGION:-}"    # empty = CENTRALIZED tenant (Root); set = REGI
 API_VERSION=""
 WEB_VERSION=""
 DOMAIN="${PLATFORM_DOMAIN:-example.local}"
-SECRET_BACKEND="${PLATFORM_SECRET_BACKEND:-generated}"   # generated | eso (ADR-07)
+SECRET_BACKEND="${PLATFORM_SECRET_BACKEND:-generated}"   # generated | eso
 
 color() { printf "\033[%sm%s\033[0m" "$1" "$2"; }
 info()  { echo "$(color '1;34' '▶') $*"; }
@@ -83,6 +83,14 @@ VC_NS="vcluster-${TENANT}-${ENVIRONMENT}"   # vCluster namespace on the host (= 
 # ── create: write the tenant.yaml (source of truth) and reconcile ───────────
 cmd_create() {
   info "Tenant '$TENANT' (env=$ENVIRONMENT) → writing source of truth"
+  # Guard: vCluster truncates synced Service names at 63 chars (+hash). The tenant-route HTTPRoute
+  # backendRef assumes the full synced name, so an over-long tenant name would silently break external
+  # routing. Reject it up front instead of provisioning a tenant whose Gateway never resolves.
+  local synced="${TENANT}-customer-api-x-${TENANT}-x-vcluster-${TENANT}-${ENVIRONMENT}"
+  if [[ ${#synced} -gt 63 ]]; then
+    err "tenant name '$TENANT' too long: its vCluster-synced Service name is ${#synced} chars (>63) and would be truncated, breaking external routing. Use a shorter name."
+    exit 1
+  fi
   mkdir -p "$(dirname "$TENANT_FILE")"
   local api="${API_VERSION:-2.23.1}"
   local web="${WEB_VERSION:-1.27-alpine}"
@@ -92,7 +100,7 @@ tenant:
   name: $TENANT
   environment: $ENVIRONMENT
   domain: $DOMAIN
-  secretBackend: $SECRET_BACKEND   # generated | eso (ADR-07)
+  secretBackend: $SECRET_BACKEND   # generated | eso
 applications:
   api:
     version: "$api"
@@ -146,7 +154,7 @@ cmd_delete() {
   fi
 }
 
-# ── status: per-component status with the EXACT PDF format ───────────────────
+# ── status: per-component status with the exact status format ───────────────────
 component_status() {
   # $1 = readable kind/selector ; prints "Ready" / "NotReady" / "Missing"
   local out="$1"

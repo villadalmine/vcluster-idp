@@ -1,5 +1,5 @@
 # Tenant in prod, region eu-west. Per-region placement materializes the blast
-# radius model (ADR-11): one host per region / sovereignty domain.
+# radius model: one host per region / sovereignty domain.
 tenant:
   name: tenant-a
   environment: prod

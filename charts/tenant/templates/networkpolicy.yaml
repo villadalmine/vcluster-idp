@@ -1,5 +1,5 @@
 {{- if .Values.networkPolicy.enabled }}
-# --- Network isolation (requirement 7) --------------------------------------
+# --- Network isolation --------------------------------------
 # Layer 2 on top of the control-plane isolation vCluster already provides.
 # default-deny pattern: deny ALL ingress, then explicitly allow
 # (intra-namespace + the chosen external-access path).

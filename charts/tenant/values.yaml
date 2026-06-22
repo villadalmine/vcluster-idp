@@ -7,7 +7,7 @@ tenant:
   environment: dev          # dev | acceptance | prod
   domain: example.local     # base for Ingress hosts
 
-# Version management (PDF requirement 5): version = image tag per app.
+# Version management: version = image tag per app.
 applications:
   api:
     version: "latest"       # e.g. "0.10.2" — mccutchen/go-httpbin tag
@@ -18,7 +18,7 @@ applications:
     image: nginx
     replicas: 1
 
-# Resource governance (PDF requirement 6).
+# Resource governance.
 resourceQuota:
   requestsCpu: "2"
   requestsMemory: 4Gi
@@ -40,7 +40,7 @@ postgres:
   # password: NOT set here. See secretBackend below.
   storage: 1Gi
   storageClassName: ""      # empty = cluster default StorageClass
-  # Secret backend (req 8):
+  # Secret backend:
   #   generated → in-chart Kubernetes Secret (randAlphaNum + lookup). Portable, no deps.
   #   eso       → External Secrets Operator: a per-namespace Password generator
   #               (no external backend; password generated in-cluster, never in Git).
@@ -49,7 +49,7 @@ postgres:
   eso:
     passwordLength: 24
 
-# External access (requirement 12). `mode` selects how the apps are exposed.
+# External access. `mode` selects how the apps are exposed.
 #   ingress → classic Ingress (needs an ingress controller). Portable default.
 #   gateway → Gateway API (HTTPRoute) served by a host Gateway controller. Modern,
 #             works through vCluster sync.toHost.gatewayApi (Cilium on this homelab).

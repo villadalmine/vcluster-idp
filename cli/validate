@@ -102,7 +102,7 @@ x() {
 # ── Phase 0 — static ───────────────────────────────────────────────────────
 sec "Static (Phase 0)"
 x "helm lint charts/tenant" "helm lint charts/tenant"
-x "helm template t charts/tenant --set tenant.name='$TENANT' --set tenant.environment='$ENV' 2>/dev/null | grep -q 'argocd.argoproj.io/sync-wave'" "sync-wave annotations render (req 10)"
+x "helm template t charts/tenant --set tenant.name='$TENANT' --set tenant.environment='$ENV' 2>/dev/null | grep -q 'argocd.argoproj.io/sync-wave'" "sync-wave annotations render"
 
 # ── Platform / GitOps ───────────────────────────────────────────────────────
 sec "Platform / GitOps"
@@ -114,9 +114,9 @@ for app in "vcluster-$TENANT-$ENV" "wl-$TENANT-$ENV" "route-$TENANT-$ENV"; do
   x "[ \"\$(kubectl -n '$ARGOCD_NS' get application '$app' -o jsonpath='{.status.health.status}' 2>/dev/null)\" = 'Healthy' ]" "$app Healthy"
 done
 
-# ── vCluster + registration (req 1, 2, Phase 2) ─────────────────────────────────
+# ── vCluster + registration (Phase 2) ─────────────────────────────────
 sec "vCluster + registration"
-x "vcluster list 2>/dev/null | grep -qE '^\s*$NS\s.*Running'" "vCluster $NS Running (req 1)"
+x "vcluster list 2>/dev/null | grep -qE '^\s*$NS\s.*Running'" "vCluster $NS Running"
 x "kubectl -n '$ARGOCD_NS' get secret -l argocd.argoproj.io/secret-type=cluster -o name 2>/dev/null | grep -q '/$NS$'" "vCluster registered in ArgoCD (Phase 2)"
 
 # ── Req 3 — namespace + pg + 2 apps + credenciales ──────────────────────────
@@ -124,7 +124,7 @@ sec "Req 3 — tenant contents"
 x "vcluster connect '$NS' -n '$NS' -- kubectl get statefulset '$TENANT-postgres' -n '$VNS'" "PostgreSQL StatefulSet"
 x "vcluster connect '$NS' -n '$NS' -- kubectl get deploy '$TENANT-customer-api' -n '$VNS'" "customer-api Deployment"
 x "vcluster connect '$NS' -n '$NS' -- kubectl get deploy '$TENANT-customer-web' -n '$VNS'" "customer-web Deployment"
-x "[ -n \"\$(vcluster connect '$NS' -n '$NS' -- kubectl get secret '$TENANT-postgres' -n '$VNS' -o jsonpath='{.data.password}' 2>/dev/null | tail -1)\" ]" "Postgres Secret auto-generated (req 8)"
+x "[ -n \"\$(vcluster connect '$NS' -n '$NS' -- kubectl get secret '$TENANT-postgres' -n '$VNS' -o jsonpath='{.data.password}' 2>/dev/null | tail -1)\" ]" "Postgres Secret auto-generated"
 
 # ── Req 5 — version management ───────────────────────────────────────────────
 sec "Req 5 — version management"
@@ -136,7 +136,7 @@ sec "Req 6 — resource governance"
 x "vcluster connect '$NS' -n '$NS' -- kubectl get resourcequota '$TENANT-quota' -n '$VNS'" "ResourceQuota"
 x "vcluster connect '$NS' -n '$NS' -- kubectl get limitrange '$TENANT-limits' -n '$VNS'" "LimitRange"
 
-# ── Req 8 — secret backend (generated | eso, ADR-07) ────────────────────────
+# ── Req 8 — secret backend (generated | eso,) ────────────────────────
 BACKEND=$(awk '/^[[:space:]]*secretBackend:/{print $2; exit}' "tenants/$ENV/$TENANT.yaml" 2>/dev/null)
 BACKEND="${BACKEND:-generated}"
 sec "Req 8 — secret backend ($BACKEND)"
@@ -209,7 +209,7 @@ x "out=\$(./cli/platform '$TENANT' create 2>&1; ./cli/platform '$TENANT' create 
 
 # ── Req 10/11 — failure handling / drift ────────────────────────────────────
 sec "Req 10/11 — failure handling / drift"
-x "[ \"\$(kubectl -n '$ARGOCD_NS' get application 'wl-$TENANT-$ENV' -o jsonpath='{.status.health.status}' 2>/dev/null)\" = 'Healthy' ]" "workload Healthy (sync waves + health gating, req 10)"
+x "[ \"\$(kubectl -n '$ARGOCD_NS' get application 'wl-$TENANT-$ENV' -o jsonpath='{.status.health.status}' 2>/dev/null)\" = 'Healthy' ]" "workload Healthy (sync waves + health gating, )"
 if $DRIFT; then
   echo "  (drift) deleting $TENANT-customer-web; waiting for selfHeal…"
   x "vcluster connect '$NS' -n '$NS' -- kubectl delete deployment '$TENANT-customer-web' -n '$VNS'" "drift manual trigger: delete customer-web"
@@ -222,12 +222,12 @@ if $DRIFT; then
     fi
   done
   if $recreated; then
-    ok "drift self-heal: customer-web recreated (req 11)"
+    ok "drift self-heal: customer-web recreated"
   else
     no "drift self-heal" "not recreated within 180s"
   fi
 else
-  skip "drift self-heal (req 11)" "destructive; run with --drift"
+  skip "drift self-heal" "destructive; run with --drift"
 fi
 
 # ── Resumen ─────────────────────────────────────────────────────────────────

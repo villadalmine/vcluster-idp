@@ -1,4 +1,4 @@
-# Resource governance (requirement 6): tenant-wide aggregate quota.
+# Resource governance: tenant-wide aggregate quota.
 apiVersion: v1
 kind: ResourceQuota
 metadata:

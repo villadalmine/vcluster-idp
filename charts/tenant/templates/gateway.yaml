@@ -3,5 +3,5 @@ External access (Gateway + HTTPRoute) is NO LONGER created here.
 It moved HOST-SIDE to charts/tenant-route (deployed by the tenant-routes
 ApplicationSet), because vCluster does not sync Gateway API objects to the host
 but DOES sync Services. Persona split: the tenant owns its Gateway + HTTPRoutes
-(in tenant-route); this workload chart stays workload-only. See ADR-06.
+(in tenant-route); this workload chart stays workload-only.
 */ -}}

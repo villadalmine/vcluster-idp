@@ -2,7 +2,7 @@ tenant:
   name: tenant-a
   environment: dev
   domain: example.local
-  secretBackend: generated   # generated | eso (ADR-07)
+  secretBackend: generated   # generated | eso
 applications:
   api:
     version: "2.23.1"

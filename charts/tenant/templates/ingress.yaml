@@ -1,5 +1,5 @@
 {{- if eq .Values.externalAccess.mode "ingress" }}
-# --- External access (requirement 12): Ingress mode ------------------------
+# --- External access: Ingress mode ------------------------
 # Per-tenant hosts: api.<tenant>.<domain> and web.<tenant>.<domain>.
 # TLS (when enabled) is issued by cert-manager (ingress-shim) from the ClusterIssuer.
 apiVersion: networking.k8s.io/v1
