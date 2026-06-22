@@ -136,7 +136,7 @@ If you do not have ArgoCD running or want to run a quick test without committing
 ---
 
 ## 2.3. Interactive Demo Recordings & Platform Showcase
-To see the CLI commands, automatic vCluster provisioning, sync waves, and E2E validation suite running in real-time, you can watch the interactive terminal recordings below:
+Real, live terminal recordings (asciinema) — click to play:
 
 <table align="center">
   <tr>
@@ -175,10 +175,12 @@ To see the CLI commands, automatic vCluster provisioning, sync waves, and E2E va
   </tr>
 </table>
 
-> ▶️ **Recording #5 (Fleet Inspection)** shows how to inspect the **created host clusters** with
-> [`cli/fleet-test`](./cli/fleet-test) (script: [`cli/showcase-fleet`](./cli/showcase-fleet)) — VM→real-node
-> placement, per-layer health via jump pods, each cluster's own ArgoCD apps, and every tenant vCluster across
-> the fleet.
+What each recording shows (one line each):
+1. **Tenant Provisioning** — `cli/platform create` writes the tenant to Git; ArgoCD provisions the vCluster + workload.
+2. **Tenant Validation** — `cli/validate` runs the functional checks against a live tenant.
+3. **Full Platform Showcase** — `cli/showcase-platform`: read-only tour (KubeVirt, Crossplane, CAPI, ArgoCD, vCluster isolation, Gateway/TLS).
+4. **Topology & Hierarchy** — `cli/showcase-topology`: the topology models live, including the recursion (`host-mgmt → mgmt-child`).
+5. **Fleet Inspection** — `cli/showcase-fleet`: reaching the created host clusters via jump pods (VM→node placement, per-layer health, each cluster's ArgoCD + vClusters).
 
 ### 📄 Full Read-Only Validation Output (Text Version)
 If the terminal recording scrolls too quickly, you can expand these sections to read the exact text output:
