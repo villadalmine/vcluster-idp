@@ -50,8 +50,8 @@ postgres:
     passwordLength: 24
 
 # External access. `mode` selects how the apps are exposed.
-#   ingress → classic Ingress (needs an ingress controller). Portable default.
-#   gateway → Gateway API (HTTPRoute) served by a host Gateway controller. Modern,
+#   ingress → classic Ingress (needs an ingress controller). Portable fallback.
+#   gateway → Gateway API (HTTPRoute) served by a host Gateway controller. The default here; modern,
 #             works through vCluster sync.toHost.gatewayApi (Cilium on this homelab).
 # TLS terminates at L7 (Ingress or Gateway) via cert-manager — never on a raw L4 LB.
 externalAccess:
