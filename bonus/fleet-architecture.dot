@@ -1,0 +1,26 @@
+digraph G {
+  rankdir=TB; bgcolor="white"; pad=0.4; nodesep=0.5; ranksep=0.8;
+  fontname="Helvetica"; fontsize=19; labelloc=t;
+  label=<<b>A fleet of Kubernetes clusters from one file — on a single bare-metal box</b><br/>Crossplane + Cluster API + KubeVirt, no cloud>;
+  node [fontname="Helvetica", shape=box, style="rounded,filled", fontsize=11, margin="0.2,0.11"];
+  edge [fontname="Helvetica", fontsize=10, color="#5e35b1", penwidth=1.5];
+
+  file [label=<<b>HostCluster</b> — one YAML file<br/><font color="#666">cpus, memory, replicas, cni, region, role</font>>, fillcolor="#e3f2fd", color="#1976d2"];
+  xp   [label=<<b>Crossplane v2</b><br/>composes the HostCluster XR into the object tree>, fillcolor="#ede7f6", color="#5e35b1"];
+  capi [label=<<b>Cluster API + CAPK</b><br/>(provider KubeVirt)<br/>declarative create / upgrade / delete>, fillcolor="#ede7f6", color="#5e35b1"];
+
+  subgraph cluster_box {
+    label=<<b>srv-t7910 — one bare-metal node (k3s + KubeVirt)</b>>; labeljust=l;
+    style="rounded,filled"; fillcolor="#fafafa"; color="#bdbdbd"; fontsize=12; margin=14;
+    cp [label=<control-plane VM<br/><font color="#666">(KubeVirt VMI)</font>>, fillcolor="#e8f5e9", color="#2e7d32"];
+    wk [label=<worker VM<br/><font color="#666">(KubeVirt VMI)</font>>, fillcolor="#e8f5e9", color="#2e7d32"];
+    lh [label=<<b>CDI DataVolumes on Longhorn</b><br/>VM disks — survive a node reboot (HCI)>, fillcolor="#fff3e0", color="#ef6c00"];
+  }
+  guest [label=<<b>a real Kubernetes cluster</b><br/>whose nodes are those VMs<br/><font color="#666">(then runs its own ArgoCD + tenants)</font>>, fillcolor="#e3f2fd", color="#1976d2"];
+
+  file -> xp -> capi;
+  capi -> cp [label="boots VMs"];
+  capi -> wk;
+  cp -> lh [style=invis]; wk -> lh [style=invis];
+  cp -> guest [color="#1976d2"]; wk -> guest [color="#1976d2"];
+}

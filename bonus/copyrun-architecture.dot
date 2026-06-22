@@ -1,0 +1,34 @@
+digraph G {
+  rankdir=LR; bgcolor="white"; pad=0.4; nodesep=0.45; ranksep=0.8;
+  fontname="Helvetica"; fontsize=19; labelloc=t;
+  label=<<b>A tenant is one Git commit</b><br/>the CLI is a GitOps facade — ArgoCD does the rest, hands-off>;
+  node [fontname="Helvetica", shape=box, style="rounded,filled", fontsize=11, margin="0.18,0.10"];
+  edge [fontname="Helvetica", fontsize=10, color="#555"];
+
+  dev [label=<<b>developer</b><br/><font face="Courier">platform &lt;t&gt; create</font>>, fillcolor="#e3f2fd", color="#1976d2"];
+  git [label=<<b>Git</b><br/>tenants/&lt;env&gt;/&lt;t&gt;.yaml<br/><font color="#666">the source of truth (a commit)</font>>, fillcolor="#fafafa", color="#bdbdbd"];
+  argo [label=<<b>ArgoCD</b> ApplicationSets<br/>(git generator)>, fillcolor="#ede7f6", color="#5e35b1"];
+
+  subgraph cluster_out {
+    label=<<b>reconciled automatically</b>>; style="rounded,dashed"; color="#90a4ae"; fontsize=12;
+    vc   [label=<vCluster created>, fillcolor="#e8f5e9", color="#2e7d32"];
+    reg  [label=<<b>vcluster-register</b> CronJob<br/>auto-registers the vCluster in ArgoCD>, fillcolor="#fff3e0", color="#ef6c00"];
+    wl   [label=<workload deployed INSIDE<br/>Postgres + API + Web>, fillcolor="#e8f5e9", color="#2e7d32"];
+  }
+
+  dev -> git [label="writes + commits"];
+  git -> argo [label="git push"];
+  argo -> vc;
+  vc -> reg [label="vc-secret"];
+  reg -> wl [label="now a target"];
+
+  del [shape=note, fillcolor="#fffde7", color="#fbc02d", fontsize=10, label=<
+    <b>delete</b> = remove the file<br align="left"/>
+    → ArgoCD prunes the Apps<br align="left"/>
+    → the same CronJob's GC reconciles<br align="left"/>
+    &nbsp;&nbsp;&nbsp;leftovers (ns/PVC/registration)<br align="left"/>
+    <b>idempotent</b>: re-create = no-op<br align="left"/>
+  >];
+  argo -> del [style=invis];
+  { rank=same; argo; del; }
+}
