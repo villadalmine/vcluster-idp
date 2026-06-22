@@ -554,7 +554,7 @@ Platform Topology & vCluster Models Showcase (read-only, live)
 ═══════════════════════════════════════════════════════════════════════════
  5. Variants validated: HA control plane & per-cluster CNI experiments
 ═══════════════════════════════════════════════════════════════════════════
- ℹ️ Concept: On the same substrate we A/B-tested control-plane HA (etcd quorum) and three CNIs. On nested KubeVirt the per-VM masquerade interfered with cross-VM overlay traffic (IPIP/Cilium); Calico-VXLAN is what we validated end-to-end (README §3.1 — framed as an experiment, not a verdict).
+ ℹ️ Concept: On the same substrate we A/B-tested control-plane HA (etcd quorum) and three CNIs. On nested KubeVirt, multi-node clusters need `bridge` VM binding (masquerade collides node IPs) plus Calico-VXLAN as the overlay — what we validated end-to-end (README §3.1 — framed as an experiment, not a verdict).
 
   • Control-plane replicas per cluster (HA = 3 → etcd quorum 2/3):
       host-euw1-control-plane   1     1     true
@@ -654,21 +654,13 @@ clusters the **control-plane hosts no tenants**: vClusters run only on the **wor
 | 7 | **vCluster isolation spectrum** | vCluster tenancy from **shared-nodes** (default, soft multi-tenancy) → dedicated/private nodes → fully separate clusters (the 9-model spectrum). Network isolation enforced by host-side `CiliumNetworkPolicy` default-deny. | shared-nodes live; deeper rungs designed (ADR-16) | Q6 (security, vCluster risks, isolation) |
 | 8 | **HCI storage for VM disks** | We moved from ephemeral **containerDisk** to **CDI DataVolumes on Longhorn** (`storageClassName: longhorn-vm`) for **all** host clusters — CDI imports the cloud image into a replicated Longhorn PVC, so a VM disk **survives a node reboot** (treating the homelab like vSAN/HCI). | all host clusters on Longhorn DataVolumes | Q1 (production storage) |
 
-> **A note on nested-KubeVirt networking (empirical, two separate layers).** Multi-node guest clusters
-> on nested KubeVirt hit cross-node failures (workers never joining, etcd not reaching quorum). Two
-> distinct things matter:
-> 1. **VM network binding — use `bridge`, not `masquerade`.** With KubeVirt **masquerade**, *every* VM
->    is NAT'd to the **same** internal IP `10.0.2.2`, so all the guest's nodes report the **same
->    InternalIP** → they collide and cross-node routing/CNI breaks (the worker stays `NotReady`,
->    `install-cni` fails). The fix is **bridge** (CAPK's default when you set no `interfaces`/`networks`):
->    each VM gets a **unique pod-network IP** (`10.0.6.x`) → unique node IPs. All our working clusters use
->    bridge; this was the real root cause of the multi-node breakage.
-> 2. **CNI overlay — `Calico-VXLAN` (UDP 4789).** On top of unique IPs, VXLAN is the dataplane we
->    validated end-to-end for the guest's pod overlay. We did not exhaustively tune the Cilium path
->    (MTU, `kubeProxyReplacement`) once VXLAN worked — an open avenue, not a dead end.
->
-> *(Honest correction: an earlier draft blamed "masquerade dropping IPIP packets". The actual multi-node
-> blocker is the masquerade IP collision above; the working clusters never used masquerade.)*
+> **A note on nested-KubeVirt networking (empirical).** Multi-node guest clusters need two things:
+> (1) **`bridge` VM binding, not `masquerade`** — masquerade NATs every VM to the same internal IP
+> `10.0.2.2`, so all guest nodes report the same `InternalIP` and cross-node routing/CNI breaks (worker
+> `NotReady`, `install-cni` fails); **bridge** (CAPK's default when you set no `interfaces`/`networks`)
+> gives each VM a unique pod IP → unique node IPs. This was the real root cause of the multi-node breakage.
+> (2) **`Calico-VXLAN` (UDP 4789)** as the pod overlay, validated end-to-end; tuning the Cilium path
+> (MTU, `kubeProxyReplacement`) is an open avenue, not a dead end.
 
 ### 3.2 Resilience & Node-Failure (honest limitation + production answer)
 
@@ -839,7 +831,7 @@ Our platform is architected to scale out using a multi-cluster fleet design rath
 | **VM / VMI** | **V**irtual **M**achine / VM **I**nstance | KubeVirt objects; the VMI is the running VM — a guest-cluster node. |
 | **CDI / DV** | **C**ontainerized **D**ata **I**mporter / **D**ata**V**olume | CDI imports a cloud image into a PVC; the DataVolume is the VM boot disk (on Longhorn / HCI). |
 | **CNI** | **C**ontainer **N**etwork **I**nterface | Pod networking plugin (Calico / Cilium). |
-| **VXLAN / IPIP** | Virtual eXtensible LAN / IP-in-IP | Calico overlay encapsulations; VXLAN (UDP 4789) crosses the nested-KubeVirt masquerade, IPIP doesn't. |
+| **VXLAN / IPIP** | Virtual eXtensible LAN / IP-in-IP | Calico overlay encapsulations; VXLAN (UDP 4789) is the one we validated end-to-end on nested KubeVirt. |
 | **vCluster** | virtual cluster | A per-tenant virtual control plane (own apiserver + etcd) on shared nodes. |
 | **ESO** | **E**xternal **S**ecrets **O**perator | Reads a secret backend and creates k8s Secrets from `ExternalSecret` references. |
 | **SOPS** | **S**ecrets **OP**eration**S** | Encrypt secrets *in* Git (no external backend). |
