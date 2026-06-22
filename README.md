@@ -687,7 +687,7 @@ Host cluster (Scope: Environment dev/acc/prod - Decentralized ArgoCD)
 
 ### 3.1 vCluster Placement & Cluster-Topology Models (variants demonstrated live)
 
-A core part of this exercise was exploring **where a tenant vCluster can live** and **who provisions
+A core part of this project was exploring **where a tenant vCluster can live** and **who provisions
 the cluster that hosts it**. The same physical homelab was used to stand up and validate the full
 spectrum below. Each row is a distinct, real model — not a paper design — and maps to the scaling /
 multi-region / security Design Questions answered in §5.
@@ -871,7 +871,7 @@ Our platform is architected to scale out using a multi-cluster fleet design rath
 *   **vCluster shared-nodes = soft isolation.** Tenants get an isolated control plane (own API/etcd/CRDs) but **share the worker nodes' kernel** (chosen for density). The honest residual risk is that shared kernel — noisy-neighbor and kernel-escape. The stronger isolation rungs that close it are designed (§3.1 model 7, and the Future Improvements section below) but not run live.
 *   **Secrets default to Helm-generated, in-chart.** Simple and Git-driven, but **no rotation / dynamic secrets**; a real backend (ESO) is opt-in, not the default.
 *   **CNI chosen empirically.** We converged on **calico-vxlan** for nested KubeVirt and did **not** exhaustively tune the Cilium guest-overlay path (MTU / `kubeProxyReplacement`) once VXLAN worked.
-*   **Explicitly out of scope** (per the brief): CI/CD pipelines, service mesh, production-grade HA, backups, a monitoring stack, custom operators, full Terraform, and enterprise IAM.
+*   **Explicitly out of scope** (by design): CI/CD pipelines, service mesh, production-grade HA, backups, a monitoring stack, custom operators, full Terraform, and enterprise IAM.
 
 ## Future Improvements (with more time)
 *   **Real node-failure resilience (multi-node).** The single-node SPOF is closed by adding hypervisor nodes — but it matters *which* mechanism solves *which* failure (a hard node crash and planned maintenance are not the same problem):
@@ -914,8 +914,8 @@ Our platform is architected to scale out using a multi-cluster fleet design rath
 | **k3s** | lightweight Kubernetes (Rancher) | The Root cluster's distribution. |
 | **RBAC** | **R**ole-**B**ased **A**ccess **C**ontrol | Kubernetes authorization (roles + bindings). |
 | **LGTM** | **L**oki **G**rafana **T**empo **M**imir | The (designed) centralized observability stack. |
-| **Q1–Q7** | **D**esign **Q**uestions | One of the **7 questions the requirements ask** to be answered in the README (scaling, app lifecycle, GitOps, version management, external access, security, tenant k8s access) — each answered in §5. *These are what the brief asks.* |
-| **ADR** | **A**rchitecture **D**ecision **R**ecord | A short note of **a design decision we made** + its rationale and trade-off (e.g. decentralized GitOps, Gateway persona split, sync waves). The key ones are listed in §3. *These are what we decided — distinct from the Design Questions (Q1–Q7), which are what's asked.* |
+| **Q1–Q7** | **D**esign **Q**uestions | One of the **7 design questions this platform answers** (scaling, app lifecycle, GitOps, version management, external access, security, tenant k8s access) — each answered in §5. |
+| **ADR** | **A**rchitecture **D**ecision **R**ecord | A short note of **a design decision we made** + its rationale and trade-off (e.g. decentralized GitOps, Gateway persona split, sync waves). The key ones are listed in §3. *These are decisions we made — distinct from the Design Questions (Q1–Q7), which frame the problem space.* |
 
 </details>
 
