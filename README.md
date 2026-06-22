@@ -799,7 +799,11 @@ Our platform is architected to scale out using a multi-cluster fleet design rath
 *   **Progressive delivery:** Argo Rollouts (canary / blue-green) wired to the Gateway API routes.
 *   **etcd backup/restore** for guest clusters (today there is none — re-provisioning is the recovery path, §3.2) and **pinned chart/image versions** everywhere for full reproducibility.
 
-## Glossary — acronyms used in this repo
+## Appendix — Glossary & References
+
+<details>
+<summary><b>📖 Glossary — acronyms used in this repo</b> (click to expand)</summary>
+
 
 | Acronym | Stands for | One-liner |
 |---|---|---|
@@ -829,3 +833,64 @@ Our platform is architected to scale out using a multi-cluster fleet design rath
 | **Q1–Q7** | **D**esign **Q**uestions | One of the **7 questions the requirements ask** to be answered in the README (scaling, app lifecycle, GitOps, version management, external access, security, tenant k8s access) — each answered in §5. *These are what the brief asks.* |
 | **ADR** | **A**rchitecture **D**ecision **R**ecord | A short note of **a design decision we made** + its rationale and trade-off (e.g. decentralized GitOps, Gateway persona split, sync waves). The key ones are listed in §3. *These are what we decided — distinct from the Design Questions (Q1–Q7), which are what's asked.* |
 
+</details>
+
+<details>
+<summary><b>🔗 References — official documentation and source</b> (click to expand)</summary>
+
+The platform is built entirely from upstream CNCF / open-source projects. Official docs and source for everything used here, grouped by layer:
+
+**Substrate & GitOps**
+- **Kubernetes** — [docs](https://kubernetes.io/docs/) · [repo](https://github.com/kubernetes/kubernetes)
+- **k3s** — the Root cluster's distribution — [docs](https://docs.k3s.io/) · [repo](https://github.com/k3s-io/k3s)
+- **Argo CD** — GitOps engine + ApplicationSets — [docs](https://argo-cd.readthedocs.io/) · [repo](https://github.com/argoproj/argo-cd)
+- **Helm** — tenant golden-path charts — [docs](https://helm.sh/docs/) · [repo](https://github.com/helm/helm)
+
+**Cluster lifecycle & fleet (Cluster API)**
+- **Cluster API (CAPI)** — clusters as declarative objects — [book](https://cluster-api.sigs.k8s.io/) · [repo](https://github.com/kubernetes-sigs/cluster-api)
+- **CAPK — Cluster API Provider KubeVirt** — nodes as KubeVirt VMs — [repo](https://github.com/kubernetes-sigs/cluster-api-provider-kubevirt)
+- **CAAPH — Cluster API Add-on Provider for Helm** — installs ArgoCD into clusters — [repo](https://github.com/kubernetes-sigs/cluster-api-addon-provider-helm)
+- **Cluster API Operator** — declarative provider management — [repo](https://github.com/kubernetes-sigs/cluster-api-operator)
+- **RKE2** + **CAPI RKE2 provider (CAPRKE2)** — the production reference (CIS/FIPS) — [docs](https://docs.rke2.io/) · [repo](https://github.com/rancher/rke2) · [CAPRKE2](https://github.com/rancher/cluster-api-provider-rke2)
+
+**Infrastructure composition**
+- **Crossplane** — the custom `HostCluster` XR/composition — [docs](https://docs.crossplane.io/) · [repo](https://github.com/crossplane/crossplane)
+- **provider-kubernetes** — wraps CAPI objects so Crossplane composes them — [repo](https://github.com/crossplane-contrib/provider-kubernetes)
+
+**Virtualization & storage**
+- **KubeVirt** — run VMs on Kubernetes — [docs](https://kubevirt.io/user-guide/) · [repo](https://github.com/kubevirt/kubevirt)
+- **CDI — Containerized Data Importer** — imports cloud images into VM-disk PVCs — [repo](https://github.com/kubevirt/containerized-data-importer)
+- **Longhorn** — replicated block storage (HCI) for VM disks — [docs](https://longhorn.io/docs/) · [repo](https://github.com/longhorn/longhorn)
+
+**Multi-tenancy**
+- **vCluster** — per-tenant virtual control plane — [docs](https://www.vcluster.com/docs) · [repo](https://github.com/loft-sh/vcluster)
+
+**Networking, ingress & TLS**
+- **Cilium** — CNI + Gateway API + NetworkPolicy — [docs](https://docs.cilium.io/) · [repo](https://github.com/cilium/cilium)
+- **Calico** — CNI variant (VXLAN/IPIP overlays) — [docs](https://docs.tigera.io/calico/latest/about/) · [repo](https://github.com/projectcalico/calico)
+- **Gateway API** — north-south routing model — [docs](https://gateway-api.sigs.k8s.io/) · [repo](https://github.com/kubernetes-sigs/gateway-api)
+- **cert-manager** — automated TLS certificates — [docs](https://cert-manager.io/docs/) · [repo](https://github.com/cert-manager/cert-manager)
+
+**Secrets**
+- **External Secrets Operator (ESO)** — backend → k8s Secrets — [docs](https://external-secrets.io/) · [repo](https://github.com/external-secrets/external-secrets)
+
+**GPU (homelab showcase — not an IDP requirement)**
+- **HAMi** — vGPU slicing without MIG hardware — [docs](https://project-hami.io/) · [repo](https://github.com/Project-HAMi/HAMi)
+
+**Helm charts we install** (each cluster's ArgoCD / CAAPH applies these — ArtifactHub + the chart repo we point at)
+- **Argo CD** — [ArtifactHub](https://artifacthub.io/packages/helm/argo/argo-cd) · `https://argoproj.github.io/argo-helm`
+- **cert-manager** — [ArtifactHub](https://artifacthub.io/packages/helm/cert-manager/cert-manager) · `https://charts.jetstack.io`
+- **Cluster API Operator** — [repo](https://github.com/kubernetes-sigs/cluster-api-operator) · chart `https://kubernetes-sigs.github.io/cluster-api-operator`
+- **Crossplane** — [repo](https://github.com/crossplane/crossplane) · chart `https://charts.crossplane.io/stable`
+- **External Secrets Operator** — [ArtifactHub](https://artifacthub.io/packages/helm/external-secrets-operator/external-secrets) · `https://charts.external-secrets.io`
+- **vCluster** — [ArtifactHub](https://artifacthub.io/packages/helm/loft/vcluster) · `https://charts.loft.sh`
+
+> KubeVirt, CDI, Calico and the Crossplane **provider-kubernetes** are installed from **upstream manifests / operators** (not Helm) — see [`fleet/`](./fleet/) and [`clusters/cni/`](./clusters/cni/). Our own charts are [`charts/tenant`](./charts/tenant/) and [`charts/tenant-route`](./charts/tenant-route/).
+
+**Provided by the Root cluster** (consumed by the platform, **not** installed by this repo — they pre-exist on the k3s Root)
+- **Cilium** — host CNI + Gateway API + LB-IPAM — [ArtifactHub](https://artifacthub.io/packages/helm/cilium/cilium) · [repo](https://github.com/cilium/cilium)
+- **Longhorn** — replicated storage for the VM disks (`longhorn-vm`) — [repo](https://github.com/longhorn/longhorn)
+- **HAMi** — vGPU slicing (only shown in the showcase) — [repo](https://github.com/Project-HAMi/HAMi) · chart repo `https://project-hami.github.io/HAMi`
+- **Gateway API** — the CRDs, served by Cilium's Gateway implementation — [repo](https://github.com/kubernetes-sigs/gateway-api)
+
+</details>
