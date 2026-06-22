@@ -1,0 +1,132 @@
+# Auto-registration of vClusters as ArgoCD clusters — for the CENTRALIZED (Root) path.
+# This is the DECLARATIVE, GitOps equivalent of the one-off `cli/register-vcluster` script: it makes the
+# central path turnkey, exactly like the regional one (clusters/regions/_base/vcluster-register.yaml).
+#
+# Why it is required: a tenant's workload (PostgreSQL/API/Web) runs INSIDE its vCluster, so the
+# tenant-workloads / tenant-eso ApplicationSets target `destination.name: vcluster-<t>-<env>` — a cluster
+# ArgoCD must have registered. Without this, `platform <t> create` brings up the vCluster but the workload
+# never deploys ("there are no clusters with this name") and the appsets sit in ErrorOccurred=True.
+#
+# A CronJob scans the vcluster-* namespaces, reads each vCluster kubeconfig (secret vc-<ns>) and creates/updates
+# the ArgoCD cluster Secret pointing at https://<vc>.<ns>:443. Idempotent (kubectl apply) and self-healing
+# (every 5 min it picks up new vClusters and GCs the ones whose vCluster is gone). This is what makes a tenant
+# a pure "git commit -> converges on its own", with no manual step. Mirror of the regional CronJob.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vcluster-register
+  namespace: argocd
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: vcluster-register
+rules:
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "list", "delete"]                       # list to register; delete to GC orphan vcluster-* namespaces
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "create", "update", "patch", "delete"]   # read vc-<ns>, write/GC the cluster Secret in argocd
+  - apiGroups: ["apps"]
+    resources: ["statefulsets"]
+    verbs: ["get", "list"]                                 # detect whether the vCluster (StatefulSet) is still alive or orphaned
+  - apiGroups: ["argoproj.io"]
+    resources: ["applications"]
+    verbs: ["get", "list", "patch"]                        # unstick wl-apps stuck in Deleting (vCluster destination already deleted)
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: vcluster-register
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: vcluster-register
+subjects:
+  - kind: ServiceAccount
+    name: vcluster-register
+    namespace: argocd
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: vcluster-register
+  namespace: argocd
+spec:
+  schedule: "*/5 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        spec:
+          serviceAccountName: vcluster-register
+          restartPolicy: Never
+          containers:
+            - name: register
+              image: alpine/k8s:1.31.0          # ships kubectl + bash + awk + base64
+              command: ["/bin/bash", "-c"]
+              args:
+                - |
+                  set -eu
+                  for ns in $(kubectl get ns -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | grep -E '^vcluster-' || true); do
+                    VC="$ns"; SECRET="vc-$ns"
+                    KCFG="$(kubectl -n "$ns" get secret "$SECRET" -o jsonpath='{.data.config}' 2>/dev/null | base64 -d || true)"
+                    [ -n "$KCFG" ] || { echo "skip $ns (no $SECRET yet)"; continue; }
+                    CA="$(printf '%s\n' "$KCFG"   | awk '/certificate-authority-data:/{print $2; exit}')"
+                    CERT="$(printf '%s\n' "$KCFG" | awk '/client-certificate-data:/{print $2; exit}')"
+                    KEY="$(printf '%s\n' "$KCFG"  | awk '/client-key-data:/{print $2; exit}')"
+                    [ -n "$CA$CERT$KEY" ] || { echo "skip $ns (no cert)"; continue; }
+                    kubectl apply -f - <<EOF
+                  apiVersion: v1
+                  kind: Secret
+                  metadata:
+                    name: $VC
+                    namespace: argocd
+                    labels:
+                      argocd.argoproj.io/secret-type: cluster
+                      platform.idp/managed-by: vcluster-register
+                  type: Opaque
+                  stringData:
+                    name: $VC
+                    server: https://$VC.$ns:443
+                    config: |
+                      {"tlsClientConfig":{"insecure":false,"caData":"$CA","certData":"$CERT","keyData":"$KEY"}}
+                  EOF
+                    echo "registered $VC"
+                  done
+
+                  # ── delete GC (reconciliation) ──────────────────────────────────────────
+                  # Deleting a tenant prunes the vcluster-app but leaves the empty ns + its PVC (StatefulSet
+                  # PVCs aren't deleted on their own) + the registration cluster-secret. The reconciler GCs them:
+                  # 1) orphan vcluster-* ns = no vCluster StatefulSet + no pods + >120s old
+                  #    (the age guard avoids deleting one that's just being created) → delete ns (cascades PVC) + its secret.
+                  for ns in $(kubectl get ns -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | grep -E '^vcluster-' || true); do
+                    kubectl -n "$ns" get statefulset "$ns" >/dev/null 2>&1 && continue   # vCluster alive → leave it
+                    [ "$(kubectl -n "$ns" get pods --no-headers 2>/dev/null | wc -l)" -eq 0 ] || continue
+                    created="$(kubectl get ns "$ns" -o jsonpath='{.metadata.creationTimestamp}' 2>/dev/null || true)"
+                    # age as an anti-race guard; busybox date can't parse RFC3339 (T...Z) → we try with a space,
+                    # and if it still fails we use epoch 0 (huge age) so as NOT to block the GC (the StatefulSet+pods check already confirms orphan).
+                    cepoch="$(date -d "$(echo "$created" | tr 'TZ' '  ')" +%s 2>/dev/null || echo 0)"
+                    age=$(( $(date +%s) - cepoch ))
+                    [ "$age" -gt 120 ] || { echo "skip GC $ns (young, ${age}s)"; continue; }
+                    echo "GC: ns $ns orphaned (vCluster deleted) -> deleting ns(+PVC) + registration secret"
+                    kubectl delete ns "$ns" --wait=false 2>/dev/null || true
+                    kubectl -n argocd delete secret "$ns" --ignore-not-found 2>/dev/null || true
+                  done
+                  # 2) registration secrets whose ns no longer exists → delete
+                  for s in $(kubectl -n argocd get secret -l platform.idp/managed-by=vcluster-register -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null || true); do
+                    kubectl get ns "$s" >/dev/null 2>&1 || { echo "GC: registration secret $s (ns missing) -> deleting"; kubectl -n argocd delete secret "$s" --ignore-not-found 2>/dev/null || true; }
+                  done
+                  # 3) wl-apps stuck in Deleting because their destination vCluster no longer exists → remove the finalizer.
+                  for app in $(kubectl -n argocd get applications -l platform.idp/layer=workload -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null || true); do
+                    [ -n "$(kubectl -n argocd get application "$app" -o jsonpath='{.metadata.deletionTimestamp}' 2>/dev/null || true)" ] || continue
+                    dest="$(kubectl -n argocd get application "$app" -o jsonpath='{.spec.destination.name}' 2>/dev/null || true)"
+                    if [ -n "$dest" ] && ! kubectl -n argocd get secret "$dest" >/dev/null 2>&1; then
+                      echo "GC: wl-app $app stuck (destination $dest not registered) -> removing finalizer"
+                      kubectl -n argocd patch application "$app" --type=json -p '[{"op":"remove","path":"/metadata/finalizers"}]' 2>/dev/null || true
+                    fi
+                  done

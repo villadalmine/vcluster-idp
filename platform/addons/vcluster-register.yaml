@@ -1,0 +1,25 @@
+# Child app of platform-root: installs the vCluster auto-registration CronJob into THIS cluster's ArgoCD
+# (the CENTRALIZED/Root path). It registers each tenant vCluster as an ArgoCD cluster so the
+# tenant-workloads / tenant-eso ApplicationSets can deploy INSIDE it — making `platform <t> create` a pure
+# "git commit -> converges on its own" with no manual `cli/register-vcluster` step. The regional hosts get the
+# equivalent via clusters/regions/_base/vcluster-register.yaml; this is the Root counterpart.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: vcluster-register
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/villadalmine/vcluster-idp.git
+    targetRevision: HEAD
+    path: platform/vcluster-register
+  destination:
+    server: https://kubernetes.default.svc   # the LOCAL host cluster (its own ArgoCD)
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
