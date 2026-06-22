@@ -1,0 +1,18 @@
+# BONUS — governance guardrail: an OVER-BUDGET GPU request stays Pending.
+# This pod asks for 8000MiB of VRAM — more than any single card has free. The HAMi scheduler
+# refuses to overcommit, so the pod stays Pending with "CardInsufficientMemory" instead of
+# starving the tenants that already hold their slices.
+apiVersion: v1
+kind: Pod
+metadata: { name: gpu-greedy, namespace: gpu-test, labels: { demo: over-budget } }
+spec:
+  restartPolicy: Never
+  containers:
+    - name: smi
+      image: nvidia/cuda:12.4.1-base-ubuntu22.04
+      command: ["sh","-c","nvidia-smi; sleep 600"]
+      resources:
+        limits:
+          nvidia.com/gpu: "1"
+          nvidia.com/gpumem: "8000"   # > any card's free VRAM -> Pending
+          nvidia.com/gpucores: "50"

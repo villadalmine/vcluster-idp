@@ -171,7 +171,7 @@ Real, live terminal recordings (asciinema) — click to play:
     </td>
     <td align="center" width="25%">
       <b>8. Bonus: Multi-tenant GPU (HAMi)</b><br/>
-      <a href="https://asciinema.org/a/bZsUVCSnLQCgWLVn" target="_blank">
+      <a href="https://asciinema.org/a/n2EoxXTNhSslSXsg" target="_blank">
         <img src="https://asciinema.org/img/play-button.png" width="80" alt="Multi-tenant GPU (HAMi vGPU)"/>
       </a>
     </td>
@@ -186,7 +186,7 @@ What each recording shows (one line each):
 5. **Topology & Hierarchy** — `cli/showcase-topology`: the topology models live, including the recursion (`host-mgmt -> mgmt-child`).
 6. **Fleet Inspection** — `cli/showcase-fleet`: reaching the created host clusters via jump pods (VM->node placement, per-layer health, each cluster's ArgoCD + vClusters).
 7. **vClusters Detail** — `cli/fleet-test vc-info`: a rich card per vCluster across the fleet — Git source + domain, its ArgoCD apps, what runs in it, what it exposes (HTTPRoute), and how to operate it (kubeconfig).
-8. **Bonus: Multi-tenant GPU (HAMi)** — a tenant pod inside its vCluster gets a HAMi-sliced vGPU (hard-capped VRAM), and an Ollama LLM answers a prompt live on the GPU. Not an IDP requirement — see [`bonus/`](./bonus/).
+8. **Bonus: Multi-tenant GPU (HAMi)** — bare-metal GPUs sliced with hard VRAM/compute caps: per-tenant GPU budget + live metrics, a tenant's capped slice inside its vCluster, an over-budget request kept **Pending** (guardrail), one pod spanning **both** cards, and a live Ollama LLM. Not an IDP requirement — see [`bonus/`](./bonus/).
 
 ### 📄 Full Read-Only Validation Output (Text Version)
 If the terminal recording scrolls too quickly, you can expand these sections to read the exact text output:
@@ -588,6 +588,82 @@ Platform Topology & vCluster Models Showcase (read-only, live)
 Same homelab, every model: hypervisor+host (1), mgmt creates clusters (2), decentralized
 regional ArgoCD (3,4), HA + CNI variants (5), and RECURSION (6: host-mgmt → mgmt-child w/ own ArgoCD → vcluster).
 ```
+</details>
+
+<details>
+<summary><b>Click to expand the full text output of the <code>Bonus: Multi-tenant GPU</code> recording (HAMi vGPU)</b></summary>
+
+```text
+━━ BONUS — Multi-tenant GPU on bare metal: HAMi vGPU (slicing, metrics, governance, multi-GPU) ━━
+
+2 physical GPUs on srv-t7910 -> HAMi slices them in software (no MIG, no passthrough) with HARD
+VRAM + compute limits -> each tenant/workload gets isolated, capped, measured slices.
+
+━━ 1/7  The bare-metal GPUs (la GPU del fierro) ━━
+
+  node srv-t7910 advertises nvidia.com/gpu = 20   (Tesla P4 7680MiB + Quadro M4000 8192MiB)
+
+━━ 2/7  GOVERNANCE — the GPU budget granted per tenant / namespace ━━
+
+What each tenant is ALLOWED (hard caps in the pod spec) — the showback / quota view:
+  NAMESPACE / TENANT          vGPU   VRAM(MiB)   CORES
+  ai                             1        6000     80%
+  gpu-test                       3       14000     80%
+  vcluster-tenant-a-dev          1        1500     15%
+
+━━ 3/7  A TENANT's HARD-capped slice (inside its own vCluster) ━━
+
+nvidia-smi from a pod INSIDE vcluster-tenant-a-dev — it sees ONLY its slice of an 8GB card:
+  |   0  Quadro M4000                   Off |   00000000:03:00.0 Off |                  N/A |
+  | 47%   44C    P8             22W /  120W |       0MiB /   1500MiB |      0%      Default |
+  -> capped to 1500MiB. The tenant cannot see or exceed its slice (hard isolation).
+
+━━ 4/7  METRICS — HAMi vGPU telemetry per tenant (the dashboard, in text) ━━
+
+  TENANT (namespace)           LIMIT(MiB)    USED(MiB)
+  gpu-test                           6000         2052
+  vcluster-tenant-a-dev              1500            0
+  physical cards:
+    NVIDIA-Quadro M4000 used = 1304 MiB
+    NVIDIA-Tesla P4 used = 1173 MiB
+  (source: hami_vgpu_memory_limit/used_bytes -> Prometheus + Grafana on the cluster)
+
+━━ 5/7  GOVERNANCE enforcement — an over-budget request is rejected (Pending) ━━
+
+A tenant asks for 8000MiB (more than any card can give). The scheduler refuses to overcommit:
+  NAME         READY   STATUS    RESTARTS   AGE     IP       NODE     NOMINATED NODE   READINESS GATES
+  gpu-greedy   0/1     Pending   0          6m44s   <none>   <none>   <none>           <none>
+  reason: CardInsufficientMemory(srv-t7910)
+  -> it stays Pending; it cannot starve the tenants that already hold their slices.
+
+━━ 6/7  MULTI-GPU — one pod (Ollama) spanning BOTH physical cards ━━
+
+Ollama got 2 vGPU (one slice per card, capped 3000MiB each) and spread the model across both:
+  index, name, memory.used [MiB], memory.total [MiB]
+  0, Quadro M4000, 963 MiB, 3000 MiB
+  1, Tesla P4, 1090 MiB, 3000 MiB
+  NAME           ID              SIZE      PROCESSOR    CONTEXT    UNTIL
+  llama3.2:1b    baf6a787fdff    2.1 GB    100% GPU     4096       3 minutes from now
+  -> the model uses VRAM on BOTH the M4000 and the P4, each within its HAMi cap.
+
+━━ 7/7  Ask the LLM (inference live across the sliced GPUs) ━━
+
+Prompt: "Write a short, funny love story between two Kubernetes pods."
+
+  In the bustling Kubernetes ecosystem, "Pod" Morgan and "Node" Nora locked eyes at the Node
+  Manager's conference, where they quickly realized their label was meant to be: "Scheduling
+  Sweethearts". As they danced around each other in the pods' designated area, they couldn't
+  help but restart their love affair with regular meetings and scheduled dates. But little
+  did they know, a rogue Container (aka "Docker") had been trying to sabotage their romance
+  by deploying its own pod-like nemesis – a malicious image labeled as "Malicious". Just when
+  all hope seemed lost, Morgan and Nora's pods were scheduled for a "deployment" of love, and
+  they refused to be restarted.
+
+━━ Real cards -> HAMi-sliced -> hard-capped, measured, quota-enforced, multi-GPU -> live LLM. ━━
+
+0
+```
+
 </details>
 
 ---

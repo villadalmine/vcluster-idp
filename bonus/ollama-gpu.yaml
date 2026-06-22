@@ -1,8 +1,9 @@
-# BONUS (not an IDP requirement) — Ollama LLM on a HAMi vGPU slice.
+# BONUS (not an IDP requirement) — Ollama LLM spanning TWO HAMi vGPU slices.
 # HAMi (already on the Root cluster) slices the bare-metal GPUs with HARD limits: the pod requests
-# nvidia.com/gpu + a VRAM cap (nvidia.com/gpumem, MiB) + a compute cap (nvidia.com/gpucores, %).
-# No MIG hardware, no GPU passthrough — software vGPU (hami-core). Models persist on a PVC so a
-# pod restart does NOT re-download them.
+# nvidia.com/gpu + a VRAM cap (nvidia.com/gpumem, MiB, PER device) + a compute cap (nvidia.com/gpucores, %).
+# No MIG hardware, no GPU passthrough — software vGPU (hami-core). Here we ask for 2 vGPU (one slice per
+# physical card) and OLLAMA_SCHED_SPREAD=1 makes Ollama spread the model across BOTH cards. Models persist
+# on a PVC so a pod restart does NOT re-download them.
 apiVersion: v1
 kind: Namespace
 metadata: { name: gpu-test }
@@ -28,14 +29,16 @@ spec:
         - name: ollama
           image: ollama/ollama:latest
           ports: [{ containerPort: 11434 }]
+          env:
+            - { name: OLLAMA_SCHED_SPREAD, value: "1" }   # spread the model across all assigned GPUs
           resources:
             requests: { cpu: "500m", memory: 1Gi }
             limits:
               cpu: "2"
               memory: 4Gi
-              nvidia.com/gpu: "1"        # one vGPU
-              nvidia.com/gpumem: "4000"  # HARD cap: 4000 MiB VRAM (of an 8 GB card)
-              nvidia.com/gpucores: "40"  # HARD cap: 40% of the GPU's compute
+              nvidia.com/gpu: "2"        # TWO vGPU — one slice per physical card
+              nvidia.com/gpumem: "3000"  # HARD cap PER device: 3000 MiB
+              nvidia.com/gpucores: "30"  # HARD cap PER device: 30% compute
           volumeMounts:
             - { name: models, mountPath: /root/.ollama }   # models persist across restarts
       volumes:

@@ -3,37 +3,37 @@
 > **Not an IDP requirement.** A differentiation extra: the homelab Root cluster has 2 physical GPUs
 > (Tesla P4, Quadro M4000) and runs **[HAMi](https://github.com/Project-HAMi/HAMi)** (CNCF Sandbox).
 > HAMi slices a GPU in **software** (no MIG hardware, no GPU passthrough) with **hard limits** on VRAM
-> (`nvidia.com/gpumem`, MiB) and compute (`nvidia.com/gpucores`, %). A pod just asks for `nvidia.com/gpu`
-> plus those caps and the HAMi scheduler/webhook place it on the GPU node and enforce the slice.
+> (`nvidia.com/gpumem`, MiB) and compute (`nvidia.com/gpucores`, %).
 
-## What this shows
-- **The bare-metal GPUs** are exposed as schedulable vGPU slices (`nvidia.com/gpu`) on the node.
-- **A tenant** (a pod **inside its vCluster**) gets a slice **hard-capped to 1500 MiB** — `nvidia-smi`
-  inside the pod sees only its slice of the 8 GB card. The tenant cannot see or exceed it.
-- **A real LLM workload** (Ollama serving `llama3.2:1b`) runs on its own slice, model persisted on a PVC,
-  and answers a prompt live on the GPU.
+## What the demo shows (7 segments)
+1. **The bare-metal GPUs** exposed as schedulable vGPU slices on the node.
+2. **Governance / showback** — the GPU budget granted per tenant / namespace.
+3. **A tenant** (a pod inside its vCluster) gets a slice **hard-capped to 1500 MiB** — `nvidia-smi` inside
+   sees only its slice of an 8 GB card.
+4. **Metrics** — HAMi per-tenant vGPU telemetry (`hami_vgpu_memory_limit/used_bytes`) → Prometheus/Grafana.
+5. **Governance enforcement** — an over-budget request (8000 MiB) stays **Pending**
+   (`CardInsufficientMemory`); it cannot starve the tenants that already hold slices.
+6. **Multi-GPU** — one pod (Ollama, `OLLAMA_SCHED_SPREAD=1`, 2 vGPU) spreads a model across **both**
+   physical cards; VRAM is used on the M4000 **and** the P4, each within its cap.
+7. **Live LLM** — Ollama answers a prompt on the sliced GPUs.
 
 ## Scope (honest)
-Only the **centralized vClusters on the Root** can use the GPU — they share the Root's nodes, including the
-GPU node. The **regional/recursive host clusters are KubeVirt VMs**, so they'd need **GPU passthrough** to
-the VM (out of scope here). The metrics path (HAMi exporter + kube-prometheus-stack Grafana/Prometheus) is
-also available on the Root.
+Only the **centralized vClusters on the Root** can use the GPU — they share the Root's nodes incl. the GPU
+node. The **regional/recursive host clusters are KubeVirt VMs**, so they'd need **GPU passthrough** (out of
+scope). The metrics path (HAMi exporter + kube-prometheus-stack) is on the Root.
 
 ## Files
-- [`ollama-gpu.yaml`](./ollama-gpu.yaml) — Ollama Deployment + PVC on a HAMi vGPU slice (host).
-- [`tenant-gpu-pod.yaml`](./tenant-gpu-pod.yaml) — a tenant pod requesting a capped slice (apply inside a vCluster).
+- [`ollama-gpu.yaml`](./ollama-gpu.yaml) — Ollama Deployment + PVC across 2 HAMi vGPU slices.
+- [`tenant-gpu-pod.yaml`](./tenant-gpu-pod.yaml) — a tenant pod with a capped slice (apply inside a vCluster).
+- [`gpu-greedy-pending.yaml`](./gpu-greedy-pending.yaml) — an over-budget pod that stays Pending (guardrail).
 - [`gpu-demo.sh`](./gpu-demo.sh) — the narrated read-only demo (the recording).
 - [`demo-gpu.cast`](./demo-gpu.cast) — the asciinema recording.
 
 ## Run
 ```bash
-# 1) LLM on a GPU slice (host)
 kubectl apply -f bonus/ollama-gpu.yaml
 kubectl -n gpu-test exec deploy/ollama -- ollama pull llama3.2:1b
-
-# 2) a tenant pod with a capped slice, INSIDE its vCluster
 vcluster connect vcluster-tenant-a-dev -n vcluster-tenant-a-dev -- kubectl apply -f bonus/tenant-gpu-pod.yaml
-
-# 3) the narrated demo
-KUBECONFIG=~/.kube/config bash bonus/gpu-demo.sh
+kubectl apply -f bonus/gpu-greedy-pending.yaml      # the Pending guardrail demo
+bash bonus/gpu-demo.sh                               # the narrated walkthrough
 ```
