@@ -140,6 +140,9 @@ cmd_delete() {
   # CronJob GCs the registration cluster-secret + orphan ns/PVC on the host.
   if [[ -z "$REGION" ]] && command -v kubectl >/dev/null 2>&1; then
     kubectl delete ns "$VC_NS" --ignore-not-found --wait=false 2>/dev/null || true
+    # Deregister the vCluster from ArgoCD so the register CronJob's GC then unsticks the in-vCluster apps
+    # (eso/workload) whose finalizer would otherwise hang against the now-deleted vCluster.
+    kubectl -n argocd delete secret "$VC_NS" --ignore-not-found 2>/dev/null || true
   fi
 }
 
