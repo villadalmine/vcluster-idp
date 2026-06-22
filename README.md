@@ -702,14 +702,14 @@ Our platform is architected to scale out using a multi-cluster fleet design rath
 *   **Scoped Kubeconfig**: Tenants run `vcluster connect` to download a kubeconfig that isolates them. In the status tool [`cli/platform`](./cli/platform#L150-L152), we query the virtual control plane directly without exposing the host context.
 *   **Logs & Metrics**: Scoped `kubectl logs` are fully supported within the vCluster plane. Centralized monitoring is designed using the LGTM stack (Loki/Grafana/Tempo/Mimir), enforcing OIDC multi-tenancy based on tenant ID headers.
 
-## 6. Trade-offs (what was simplified — on purpose)
+## Trade-offs (what was simplified — on purpose)
 *   **Single KVM node = SPOF.** All guest VMs are pinned to one x86/KVM host (`srv-t7910`); even the "HA" control plane stacks its 3 VMs on that one box, so it is HA against a VM/process failure but **not** against the node dying (full detail + recovery lesson in §3.2).
-*   **vCluster shared-nodes = soft isolation.** Tenants get an isolated control plane (own API/etcd/CRDs) but **share the worker nodes' kernel** (chosen for density). The honest residual risk is that shared kernel — noisy-neighbor and kernel-escape. The stronger isolation rungs that close it are designed (§3.1 model 7, and §7 below) but not run live.
+*   **vCluster shared-nodes = soft isolation.** Tenants get an isolated control plane (own API/etcd/CRDs) but **share the worker nodes' kernel** (chosen for density). The honest residual risk is that shared kernel — noisy-neighbor and kernel-escape. The stronger isolation rungs that close it are designed (§3.1 model 7, and the Future Improvements section below) but not run live.
 *   **Secrets default to Helm-generated, in-chart.** Simple and Git-driven, but **no rotation / dynamic secrets**; a real backend (ESO) is opt-in, not the default.
 *   **CNI chosen empirically.** We converged on **calico-vxlan** for nested KubeVirt and did **not** exhaustively tune the Cilium guest-overlay path (MTU / `kubeProxyReplacement`) once VXLAN worked.
 *   **Explicitly out of scope** (per the brief): CI/CD pipelines, service mesh, production-grade HA, backups, a monitoring stack, custom operators, full Terraform, and enterprise IAM.
 
-## 7. Future Improvements (with more time)
+## Future Improvements (with more time)
 *   **Real node-failure resilience (multi-node).** The single-node SPOF is closed by adding hypervisor nodes — but it matters *which* mechanism solves *which* failure (a hard node crash and planned maintenance are not the same problem):
     *   *Unplanned node death:* spread the 3 control-plane VMs **across different physical nodes** so etcd keeps quorum (2/3) when one node dies (today they stack on one box); back the VM disks with **replicated RWX storage** (Longhorn) so a recreated VM can re-attach its disk; and let the **`MachineHealthCheck` we already run** (§3.2 — CAPI auto-recreates an unhealthy Machine) replace the lost worker, tuned to `maxUnhealthy ~40%` (only meaningful with multiple nodes). On a hard crash the VM is **lost and recreated** (brief downtime) — *not* migrated; KubeVirt has no automatic live-failover.
     *   *Planned node maintenance:* **then** KubeVirt **live-migration** is the right tool — it moves a *running* VM to another host with no downtime so you can drain a hypervisor for patching. It needs shared/RWX storage and a still-healthy source node, so it helps for maintenance, **not** for a node that already died.
@@ -719,7 +719,7 @@ Our platform is architected to scale out using a multi-cluster fleet design rath
 *   **Progressive delivery:** Argo Rollouts (canary / blue-green) wired to the Gateway API routes.
 *   **etcd backup/restore** for guest clusters (today there is none — re-provisioning is the recovery path, §3.2) and **pinned chart/image versions** everywhere for full reproducibility.
 
-## 8. Glossary — acronyms used in this repo
+## Glossary — acronyms used in this repo
 
 | Acronym | Stands for | One-liner |
 |---|---|---|
