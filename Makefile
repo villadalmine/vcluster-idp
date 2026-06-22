@@ -51,24 +51,11 @@ appsets: ## Apply both ApplicationSets (vclusters + workloads)
 	@kubectl apply -f applicationsets/tenants-appset.yaml
 	@echo "✔ ApplicationSets applied"
 
-.PHONY: create
-create: ## Provision a tenant (TENANT=... ENV=...) via direct helm+vcluster (demo flow)
-	@vcluster create $(TENANT)-$(ENV) --namespace vcluster-$(TENANT)-$(ENV) -f vcluster/shared-nodes.yaml --connect=false || true
-	@helm upgrade --install $(TENANT) charts/tenant \
-		--kube-context vcluster_$(TENANT)-$(ENV)_vcluster-$(TENANT)-$(ENV) \
-		--set tenant.name=$(TENANT) --set tenant.environment=$(ENV) \
-		--create-namespace --namespace $(TENANT)
-	@echo "✔ tenant $(TENANT) deployed (helm upgrade --install = idempotent)"
-
+# Tenant lifecycle (create / status / delete) is the CLI facade — the GitOps path:
+#   ./cli/platform <tenant> create|status|delete   (writes/commits tenants/<env>/<t>.yaml; ArgoCD reconciles)
 .PHONY: status
 status: ## Status of a tenant (TENANT=... ENV=...)
 	@./cli/platform $(TENANT) status
-
-.PHONY: delete
-delete: ## Delete a tenant (TENANT=... ENV=...)
-	@helm uninstall $(TENANT) --namespace $(TENANT) 2>/dev/null || true
-	@vcluster delete $(TENANT)-$(ENV) --namespace vcluster-$(TENANT)-$(ENV) 2>/dev/null || true
-	@./cli/platform $(TENANT) delete
 
 .PHONY: lint
 lint: ## Validate the repo YAML and the chart syntax

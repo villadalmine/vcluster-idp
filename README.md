@@ -88,10 +88,7 @@ reconciles → Crossplane/CAPI build the host cluster → ArgoCD inside it build
 
 ## 2. Quick Start: How to Run & Verify
 
-You can run and test this repository in two different modes depending on your local cluster capabilities:
-
-### Option A: The GitOps & ArgoCD Flow (Recommended)
-This option demonstrates the production-like declarative GitOps workflow. It requires a cluster running ArgoCD.
+The supported flow is declarative GitOps: the CLI commits the tenant to Git and ArgoCD reconciles everything (the vCluster, the auto-registration, and the workload inside it). It runs on any cluster with ArgoCD installed.
 
 1.  **Bootstrap the Platform Add-ons**:
     ```bash
@@ -119,27 +116,6 @@ This option demonstrates the production-like declarative GitOps workflow. It req
 5.  **Delete the Tenant**:
     ```bash
     ./cli/platform tenant-a delete
-    ```
-
----
-
-### Option B: The Direct Helm & vCluster Flow (Quick Local Demo)
-If you do not have ArgoCD running or want to run a quick test without committing files to Git, you can bypass ArgoCD and deploy the Helm chart and vCluster directly:
-
-1.  **Deploy the vCluster and Workload**:
-    This command will spin up a local vCluster using [`vcluster/shared-nodes.yaml`](./vcluster/shared-nodes.yaml) and immediately deploy [`charts/tenant`](./charts/tenant) inside it using your current local kube-context:
-    ```bash
-    make create TENANT=tenant-a ENV=dev
-    ```
-2.  **Verify the Workloads Inside the vCluster**:
-    Connect to the virtual cluster and list the running resources:
-    ```bash
-    vcluster connect tenant-a-dev --namespace vcluster-tenant-a-dev -- kubectl get pods -n tenant-a
-    # You should see: tenant-a-postgres-0, customer-api-*, and customer-web-* running
-    ```
-3.  **Delete the Local Resources**:
-    ```bash
-    make delete TENANT=tenant-a ENV=dev
     ```
 
 ---
