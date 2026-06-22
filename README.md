@@ -168,7 +168,7 @@ To see the CLI commands, automatic vCluster provisioning, sync waves, and E2E va
   <tr>
     <td align="center" width="25%">
       <b>5. Fleet Inspection (fleet-test)</b><br/>
-      <a href="https://asciinema.org/a/MyLsOSQdv3epfURP" target="_blank">
+      <a href="https://asciinema.org/a/7JXZyO63tSqVxQoK" target="_blank">
         <img src="https://asciinema.org/img/play-button.png" width="80" alt="Fleet Inspection"/>
       </a>
     </td>
