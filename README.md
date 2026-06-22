@@ -47,10 +47,10 @@ Use these links to navigate directly to the code implementing each component of 
     *   [`capi-providers.yaml`](./fleet/config/capi-providers.yaml) · [`storageclass-vm.yaml`](./fleet/config/storageclass-vm.yaml) — the CAPI providers and the Longhorn StorageClass backing VM disks.
 *   **Virtualization & HCI storage**: [`fleet/kubevirt/`](./fleet/kubevirt/) (KubeVirt VM controller) and [`fleet/cdi/`](./fleet/cdi/) (CDI — imports the cloud image into a replicated Longhorn PVC per VM disk).
 *   **Platform bootstrap (app-of-apps)**: [`platform/root-app.yaml`](./platform/root-app.yaml) + [`platform/addons/`](./platform/addons/) — each cluster's ArgoCD self-installs the platform services from here (CAPI operator, Crossplane, KubeVirt/CDI, provider-kubernetes, the `fleet-*` ApplicationSets, the tenant ApplicationSets, and `vcluster-register`).
-*   **CNI bootstrap (egg-and-chicken)**: [`clusters/cni/`](./clusters/cni/) — a `ClusterResourceSet` seeds the CNI into each freshly-created cluster, with per-cluster variants ([`calico-vxlan.yaml`](./clusters/cni/calico-vxlan.yaml), [`calico.yaml`](./clusters/cni/calico.yaml), [`cilium.yaml`](./clusters/cni/cilium.yaml)).
+*   **CNI bootstrap (egg-and-chicken)**: [`clusters/cni/`](./clusters/cni/) — a `ClusterResourceSet` per CNI variant seeds the CNI into each freshly-created cluster (matched by the cluster's `cni` label) ([`calico-vxlan.yaml`](./clusters/cni/calico-vxlan.yaml), [`calico.yaml`](./clusters/cni/calico.yaml), [`cilium.yaml`](./clusters/cni/cilium.yaml)).
 *   **Recursion (management-of-managements)**: [`clusters/management/`](./clusters/management/) — a `management` cluster receives ArgoCD + a region-root via CAAPH/CRS (`helmchartproxy-*.yaml`, `region-root-*.yaml`) and itself CREATES a child workload cluster (`mgmt-child-*.yaml`) on the Root's KubeVirt.
 *   **Regional GitOps Base**: [`clusters/regions/`](./clusters/regions/) — parameterized regional root + tenants for multi-region; the shared body lives in [`_base/`](./clusters/regions/_base/) (token `REGION`), instantiated per region like `eu-west1`.
-*   **vCluster isolation models**: [`vcluster/`](./vcluster/) — the per-tenant control-plane definitions ([`shared-nodes.yaml`](./vcluster/shared-nodes.yaml) default, [`private-nodes.yaml`](./vcluster/private-nodes.yaml)); the isolation knob from §3.1.
+*   **vCluster isolation models**: [`vcluster/`](./vcluster/) — the per-tenant control-plane definitions ([`shared-nodes.yaml`](./vcluster/shared-nodes.yaml) default, [`private-nodes.yaml`](./vcluster/private-nodes.yaml)) — the isolation spectrum: shared-nodes (default) -> dedicated/private nodes -> separate clusters.
 *   **Production reference (paper)**: [`clusters/prod/eu-west-host.yaml`](./clusters/prod/eu-west-host.yaml) — how a host would be defined in production (RKE2 + CIS hardening); a reference, not running in the homelab.
 
 ---
@@ -636,7 +636,7 @@ clusters the **control-plane hosts no tenants**: vClusters run only on the **wor
 | 4 | **Recursion: management-of-managements + full stack one rung down** | `host-mgmt` (`role=management`) runs its **own full CAPI + CAAPH** and **creates its OWN child** (`mgmt-child`, VMs on the Root's KubeVirt via **external-infra**), then **delivers the child the SAME stack the Root gives its regionals** — ArgoCD (CAAPH), `region-root` and CNI (CRS) — so the child ends up **decentralized (own ArgoCD, no SPOF) hosting its own tenant vCluster**. Whole chain validated **clean-room** (torn down in reverse, rebuilt 100% from git). | `host-mgmt` → `mgmt-child` (own ArgoCD + `vcluster-tenant-z` pg/api/web running) | Q1 (hierarchical fleet, recursive scaling) |
 | 5 | **HA control plane host cluster** | A host cluster with **3 control-plane replicas / etcd quorum** (2-of-3), vs the single-CP default — set via `HostCluster.spec.controlPlaneReplicas`. | validated on a 3-CP host cluster (`host-c`, etcd quorum on calico-vxlan); not in the current lean set | Q1 (production resilience) |
 | 6 | **Per-cluster CNI variants (an experiment)** | The CNI is selectable per cluster via the `cni` field: **Calico (IPIP)**, **Cilium**, **Calico-VXLAN**. We A/B'd all three on nested KubeVirt and **converged on Calico-VXLAN** for multi-VM clusters (see the note below). | all multi-VM clusters on `calico-vxlan` | Q5/Q6 (networking) |
-| 7 | **vCluster isolation spectrum** | vCluster tenancy from **shared-nodes** (default, soft multi-tenancy) → dedicated/private nodes → fully separate clusters (the 9-model spectrum). Network isolation enforced by host-side `CiliumNetworkPolicy` default-deny. | shared-nodes live; deeper rungs designed (ADR-16) | Q6 (security, vCluster risks, isolation) |
+| 7 | **vCluster isolation spectrum** | vCluster tenancy from **shared-nodes** (default, soft multi-tenancy) → dedicated/private nodes → fully separate clusters (the 9-model spectrum). Network isolation enforced by host-side `CiliumNetworkPolicy` default-deny. | shared-nodes live; deeper rungs designed | Q6 (security, vCluster risks, isolation) |
 | 8 | **HCI storage for VM disks** | We moved from ephemeral **containerDisk** to **CDI DataVolumes on Longhorn** (`storageClassName: longhorn-vm`) for **all** host clusters — CDI imports the cloud image into a replicated Longhorn PVC, so a VM disk **survives a node reboot** (treating the homelab like vSAN/HCI). | all host clusters on Longhorn DataVolumes | Q1 (production storage) |
 
 > **A note on nested-KubeVirt networking (empirical).** Multi-node guest clusters need two things:
@@ -811,7 +811,6 @@ Our platform is architected to scale out using a multi-cluster fleet design rath
 | **CRS** | **C**luster **R**esource **S**et | CAPI mechanism to seed raw manifests (CNI, `region-root`) into freshly-created clusters. |
 | **CRD** | **C**ustom **R**esource **D**efinition | Extends the Kubernetes API with a new object kind. |
 | **XR / XRD** | Composite **R**esource / its **D**efinition | Crossplane: an instance of our custom `HostCluster` platform API, and its schema. |
-| **KCP** | **K**ubeadm**C**ontrol**P**lane | CAPI control-plane object (etcd + apiserver replicas) provisioned via kubeadm. |
 | **MD** | **M**achine**D**eployment | CAPI object managing a set of worker Machines (like a Deployment, for nodes). |
 | **VM / VMI** | **V**irtual **M**achine / VM **I**nstance | KubeVirt objects; the VMI is the running VM — a guest-cluster node. |
 | **CDI / DV** | **C**ontainerized **D**ata **I**mporter / **D**ata**V**olume | CDI imports a cloud image into a PVC; the DataVolume is the VM boot disk (on Longhorn / HCI). |
@@ -825,10 +824,7 @@ Our platform is architected to scale out using a multi-cluster fleet design rath
 | **SPOF** | **S**ingle **P**oint **O**f **F**ailure | What the decentralized per-cluster ArgoCD design avoids. |
 | **HA** | **H**igh **A**vailability | e.g. 3 control-plane replicas → etcd quorum 2/3. |
 | **k3s** | lightweight Kubernetes (Rancher) | The Root cluster's distribution. |
-| **LB-IPAM / VIP** | LoadBalancer IP Address Mgmt / Virtual IP | Cilium assigns LB services an external IP, announced over **L2** (ARP). |
-| **SNI** | **S**erver **N**ame **I**ndication | TLS hostname in the handshake; the Gateway routes/serves by it. |
 | **RBAC** | **R**ole-**B**ased **A**ccess **C**ontrol | Kubernetes authorization (roles + bindings). |
-| **SSA** | **S**erver-**S**ide **A**pply | Field-managed apply; re-applying identical specs is a no-op. |
 | **LGTM** | **L**oki **G**rafana **T**empo **M**imir | The (designed) centralized observability stack. |
 | **Q1–Q7** | **D**esign **Q**uestions | One of the **7 questions the requirements ask** to be answered in the README (scaling, app lifecycle, GitOps, version management, external access, security, tenant k8s access) — each answered in §5. *These are what the brief asks.* |
 | **ADR** | **A**rchitecture **D**ecision **R**ecord | A short note of **a design decision we made** + its rationale and trade-off (e.g. decentralized GitOps, Gateway persona split, sync waves). The key ones are listed in §3. *These are what we decided — distinct from the Design Questions (Q1–Q7), which are what's asked.* |
