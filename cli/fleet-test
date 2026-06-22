@@ -8,6 +8,7 @@
 #
 #   cli/fleet-test check [cluster|all]      # validate every layer (nodes/CNI/DNS/ArgoCD/vCluster)
 #   cli/fleet-test vclusters                # list ALL vClusters across every host cluster
+#   cli/fleet-test vc-info                  # RICH per-vCluster card: git source+domain, workloads, HTTPRoute, access
 #   cli/fleet-test vms                      # list every KubeVirt VM and the real hypervisor node it runs on
 #   cli/fleet-test kc <cluster> <args...>   # kubectl passthrough to a host cluster
 #   cli/fleet-test vc <cluster> <vc> <args> # kubectl INSIDE a vCluster
@@ -74,6 +75,14 @@ kc() {
   else
     timeout 30 kubectl -n $NS exec -i "jump-$c" -- kubectl --kubeconfig=/kc/value "$@" 2>&1
   fi
+}
+
+# q <cluster> <kubectl args> — run against a cluster: "@root" = the local management cluster (direct),
+# anything else = a host cluster through its jump pod. Lets vc-info cover the centralized vClusters
+# (on the Root) AND the regional/recursive ones (on host clusters) with one code path.
+q() {
+  local c=$1; shift
+  if [ "$c" = "@root" ]; then timeout 30 kubectl "$@" 2>&1; else kc "$c" "$@"; fi
 }
 
 # Map a guest node (a KubeVirt VM) to the REAL hypervisor node it runs on. The guest node name equals the
@@ -182,6 +191,59 @@ list_vclusters() {
   done
 }
 
+vc_one() {  # rich card for one vCluster: where it comes from, what runs, what it exposes, how to operate it
+  local c=$1 ns=$2
+  local rest=${ns#vcluster-}; local env=${rest##*-}; local tenant=${rest%-*}
+  echo -e "    $(c0 '1;36' "● $ns")  (tenant=$tenant env=$env)"
+  # FROM (git provenance): root tenants live under tenants/, host-cluster ones under clusters/regions/
+  local scope; [ "$c" = "@root" ] && scope="tenants" || scope="clusters/regions"
+  local src; src=$(grep -rls "name: ${tenant}$" "$scope" 2>/dev/null | while read -r f; do grep -qE "environment:[[:space:]]*${env}([[:space:]]|$)" "$f" && echo "$f"; done | head -1)
+  local domain api web
+  if [ -n "$src" ]; then
+    domain=$(awk '/^[[:space:]]*domain:/{print $2; exit}' "$src")
+    api=$(awk '/api:/{f=1} f&&/version:/{gsub(/"/,"",$2);print $2;exit}' "$src")
+    web=$(awk '/web:/{w=1} w&&/version:/{gsub(/"/,"",$2);print $2;exit}' "$src")
+  fi
+  echo "      from (git):  ${src:-<source file not found>}${domain:+   domain=$domain}"
+  # MANAGED BY: the ArgoCD apps for this tenant (Root's central ArgoCD, or the host cluster's own one)
+  local apps; apps=$(q "$c" -n argocd get applications --no-headers 2>/dev/null | awk -v t="$tenant-$env" '$1 ~ ("(vcluster|wl|route|eso)-" t "$") {printf "%s(%s/%s) ", $1,$2,$3}')
+  echo "      managed by:  ${apps:-<none>}"
+  # RUNS: which workload components are present in the host-side namespace (vCluster syncs them here)
+  local pods comp run; pods=$(q "$c" -n "$ns" get pods --no-headers 2>/dev/null)
+  comp=""
+  echo "$pods" | grep -q "customer-api"     && comp="$comp customer-api"
+  echo "$pods" | grep -q "customer-web"     && comp="$comp customer-web"
+  echo "$pods" | grep -q "postgres"         && comp="$comp postgres"
+  echo "$pods" | grep -q "coredns"          && comp="$comp coredns"
+  echo "$pods" | grep -q "external-secrets" && comp="$comp eso"
+  echo "$pods" | grep -qE "^${ns}-0|vcluster" && comp="$comp vcluster-cp"
+  run=$(echo "$pods" | grep -c Running)
+  echo "      runs:       ${comp:- (none)}   [${run:-0} pods Running${api:+, api $api, web $web}]"
+  # EXPOSES: external HTTPS — the host-side HTTPRoute hostnames (routes-appset deploys them here).
+  # Regional/recursive host clusters may not have the Gateway API CRD; kc merges stderr, so filter errors.
+  local routeout hosts; routeout=$(q "$c" -n "$ns" get httproute -o jsonpath='{range .items[*]}{.spec.hostnames}{" "}{end}' 2>/dev/null)
+  if echo "$routeout" | grep -qiE "error|terminated|doesn.t have|no resources"; then
+    echo "      exposes:    <no HTTPRoute — Gateway API not present on this cluster>"
+  else
+    hosts=$(echo "$routeout" | tr -d '[]"' | xargs 2>/dev/null)
+    echo "      exposes:    ${hosts:-<no HTTPRoute>}"
+  fi
+  # ACCESS: its own kubeconfig (per-tenant control plane) — how you actually operate the vCluster
+  echo "      access:     vcluster connect $ns -n $ns   (kubeconfig: secret vc-$ns, key config)"
+}
+
+vc_info() {  # rich listing of EVERY vCluster in the fleet: provenance, workloads, exposure, access
+  hdr "vClusters — where they come from, what runs, what they expose, how to operate them"
+  local c label nss ns
+  for c in @root $ALL; do
+    if [ "$c" = "@root" ]; then label="ROOT (centralized, in-cluster)"; else ensure_jump "$c" >/dev/null 2>&1 || continue; label="$c (CAPI host cluster, via jump pod)"; fi
+    nss=$(q "$c" get ns --no-headers 2>/dev/null | awk '/^vcluster-/{print $1}')
+    [ -n "$nss" ] || continue
+    echo; echo -e "  $(c0 '1;35' "▼ host: $label")"
+    while read -r ns; do [ -n "$ns" ] && vc_one "$c" "$ns"; done <<< "$nss"
+  done
+}
+
 list_vms() {  # every KubeVirt guest node (VM) across the fleet and the REAL hypervisor node it runs on
   hdr "KubeVirt VMs → real hypervisor node"
   kubectl get vmi -A -o custom-columns='NAMESPACE:.metadata.namespace,VM (guest node):.metadata.name,PHASE:.status.phase,REAL NODE:.status.nodeName' 2>/dev/null \
@@ -196,11 +258,12 @@ ALL="$(discover_clusters)"
 case "$cmd" in
   check)   t=${1:-all}; if [ "$t" = all ]; then fleet_banner; for c in $ALL; do check "$c"; done; else check "$t"; fi ;;
   vclusters) fleet_banner; list_vclusters ;;
+  vc-info) vc_info ;;
   vms)     list_vms ;;
   dns)     ensure_jump "$1" && { echo -n "cross-node DNS $1: "; dns_test "$1"; } ;;
   kc)      c=$1; shift; ensure_jump "$c" && kc "$c" "$@" ;;
   vc)      c=$1; v=$2; shift 2; ensure_jump "$c" && kc "$c" -n "$v" exec "deploy/$v" -- /bin/sh -c "kubectl $*" 2>&1 || warn "to enter the vCluster use: vcluster connect <v> -n <v> (from the host)" ;;
   demo)    fleet_banner; for c in $ALL; do check "$c"; done; list_vclusters ;;
   clean)   clean ;;
-  *) echo "usage: cli/fleet-test {check [cluster|all]|vclusters|vms|dns <c>|kc <c> <args>|demo|clean}"; exit 1 ;;
+  *) echo "usage: cli/fleet-test {check [cluster|all]|vclusters|vc-info|vms|dns <c>|kc <c> <args>|demo|clean}"; exit 1 ;;
 esac
