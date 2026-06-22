@@ -168,7 +168,7 @@ To see the CLI commands, automatic vCluster provisioning, sync waves, and E2E va
   <tr>
     <td align="center" width="25%">
       <b>5. Fleet Inspection (fleet-test)</b><br/>
-      <a href="./showcase-fleet.cast" target="_blank">
+      <a href="https://asciinema.org/a/MyLsOSQdv3epfURP" target="_blank">
         <img src="https://asciinema.org/img/play-button.png" width="80" alt="Fleet Inspection"/>
       </a>
     </td>
@@ -178,8 +178,7 @@ To see the CLI commands, automatic vCluster provisioning, sync waves, and E2E va
 > ▶️ **Recording #5 (Fleet Inspection)** shows how to inspect the **created host clusters** with
 > [`cli/fleet-test`](./cli/fleet-test) (script: [`cli/showcase-fleet`](./cli/showcase-fleet)) — VM→real-node
 > placement, per-layer health via jump pods, each cluster's own ArgoCD apps, and every tenant vCluster across
-> the fleet. It is committed as [`showcase-fleet.cast`](./showcase-fleet.cast); run `asciinema upload
-> showcase-fleet.cast` to get an asciinema.org player link and swap it into the cell above (same as #1–4).
+> the fleet.
 
 ### 📄 Full Read-Only Validation Output (Text Version)
 If the terminal recording scrolls too quickly, you can expand these sections to read the exact text output:
