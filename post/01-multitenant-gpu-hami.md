@@ -1,7 +1,45 @@
 # Post 01 — Multi-tenant GPU on bare metal (HAMi)
 
-**Assets:** asciinema video `https://asciinema.org/a/eaoQKFsHhVDQ7qXc` · diagram `bonus/gpu-architecture.png`
-**Tags:** Kubernetes · GPU · HAMi · vCluster · Ollama · LLM · DevOps · Homelab
+**Tags:** Kubernetes · GPU · HAMi · vCluster · Ollama · LLM · DevOps · PlatformEngineering · Homelab · CNCF
+
+---
+
+## ▶️ Assets — everything used to build this
+
+### Videos (asciinema)
+| Video | Link | Source script | Cast |
+|---|---|---|---|
+| **Cinematic — 3 tenants · 2 GPUs · 3 stories** | https://asciinema.org/a/eaoQKFsHhVDQ7qXc | [`bonus/gpu-3tenant.sh`](../bonus/gpu-3tenant.sh) | [`bonus/demo-3tenant-gpu.cast`](../bonus/demo-3tenant-gpu.cast) |
+| **GPU deep-dive — slicing · governance · metrics · over-budget Pending · multi-GPU · LLM (7 segments)** | https://asciinema.org/a/n2EoxXTNhSslSXsg | [`bonus/gpu-demo.sh`](../bonus/gpu-demo.sh) | [`bonus/demo-gpu.cast`](../bonus/demo-gpu.cast) |
+
+### Diagram (attach this to the post)
+- ![arch](../bonus/gpu-architecture.png) — [`bonus/gpu-architecture.png`](../bonus/gpu-architecture.png) (source: [`bonus/gpu-architecture.dot`](../bonus/gpu-architecture.dot), Graphviz)
+
+### Manifests
+| File | What |
+|---|---|
+| [`bonus/tenant-llm-2gpu.yaml`](../bonus/tenant-llm-2gpu.yaml) | per-tenant Ollama with **2 vGPU** (one slice per card) — the cinematic |
+| [`bonus/ollama-gpu.yaml`](../bonus/ollama-gpu.yaml) | Ollama Deployment + PVC spanning 2 vGPU (host) |
+| [`bonus/tenant-gpu-pod.yaml`](../bonus/tenant-gpu-pod.yaml) | a tenant pod with a single capped slice |
+| [`bonus/gpu-greedy-pending.yaml`](../bonus/gpu-greedy-pending.yaml) | over-budget request that stays **Pending** (governance guardrail) |
+
+### Write-up
+- [`bonus/README.md`](../bonus/README.md) — full explanation + how to run.
+
+### Key commands (how it was built)
+```bash
+# per-tenant LLM with 2 vGPU, inside each tenant's vCluster
+for t in a b c; do
+  vcluster connect vcluster-tenant-$t-dev -n vcluster-tenant-$t-dev -- \
+    kubectl apply -n tenant-$t -f bonus/tenant-llm-2gpu.yaml
+  vcluster connect vcluster-tenant-$t-dev -n vcluster-tenant-$t-dev -- \
+    kubectl -n tenant-$t exec deploy/tenant-llm -- ollama pull llama3.2:1b
+done
+# the cinematic (3 tenants, 3 stories)
+bash bonus/gpu-3tenant.sh
+# the diagram
+dot -Tpng -Gdpi=140 bonus/gpu-architecture.dot -o bonus/gpu-architecture.png
+```
 
 ---
 
@@ -62,5 +100,8 @@ Por qué está bueno: las GPUs son caras y normalmente quedan 1:1 con un workloa
 ---
 
 ## Notes (no publicar)
-- Adjuntar `bonus/gpu-architecture.png`. Para el video: el link de asciinema, o grabar la pantalla del `.cast` reproduciéndose (`asciinema play bonus/demo-3tenant-gpu.cast`) y subir como video/gif.
-- Las 3 historias salen con seed fijo (reproducibles). Si querés otras, cambiá el seed en `bonus/gpu-3tenant.sh`.
+- Para el video en LinkedIn: subí el link de asciinema, o grabá la pantalla reproduciendo el cast
+  (`asciinema play bonus/demo-3tenant-gpu.cast`) y subilo como video/gif.
+- Las 3 historias salen con seed fijo (reproducibles). Cambiá el seed en `bonus/gpu-3tenant.sh` para otras.
+- Variante más técnica del mismo tema: el video de 7 segmentos (governance/metrics/Pending/multi-GPU) sirve
+  para un post más "deep-dive" o un carrusel.
