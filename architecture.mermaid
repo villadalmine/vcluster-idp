@@ -33,3 +33,7 @@ flowchart TB
   ROOT -->|"appset #2: deploy chart inside"| WL
   CLI -->|"commit tenant.yaml"| GIT
   CLI -.->|"connect / operate (vcluster, status)"| HOST
+
+  %% The stack in one line (Crossplane = optional composition layer, not in the demo)
+  STACK["Stack layering — ArgoCD delivers (Git → cluster) · CAPI creates real clusters (VM/baremetal) · Crossplane (optional) composes any infra into your platform API · vCluster = the cheap per-tenant cluster on top"]:::gitops
+  HOST ~~~ STACK

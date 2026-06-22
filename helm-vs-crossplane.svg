@@ -1,0 +1,73 @@
+<svg viewBox="0 0 840 600" xmlns="http://www.w3.org/2000/svg" role="img" font-family="ui-sans-serif, system-ui, sans-serif">
+  <title>Helm vs Crossplane — two paths to provision a tenant, coexisting</title>
+  <desc>The same Git → ArgoCD feeds two paths. Helm (a/b/c): Argo installs charts/tenant directly. Crossplane v2 (d): Argo applies a namespaced GPUTenant XR (no Claim in v2), Crossplane composes it — either via provider-helm reusing the SAME chart, or composing the k8s objects directly. ArgoCD installs Crossplane as an add-on. They coexist.</desc>
+  <style>
+    text{fill:#1a1a1a;} .sub{fill:#5a5a5a;} .info{fill:#1f6feb;}
+    .p{fill:rgba(130,130,130,0.10);} .b{fill:rgba(130,130,130,0.08);} .n{fill:rgba(130,130,130,0.06);}
+    rect{stroke:#c9c9c9;} .il{stroke:#1f6feb;} line{stroke:#888;}
+    @media (prefers-color-scheme: dark){ text{fill:#e6e6e6;} .sub{fill:#a0a0a0;} .info{fill:#58a6ff;} rect{stroke:#444;} .il{stroke:#58a6ff;} line{stroke:#888;} }
+  </style>
+  <defs>
+    <marker id="ar" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#888"/></marker>
+  </defs>
+
+  <text x="420" y="26" text-anchor="middle" font-size="17" font-weight="700">Helm vs Crossplane — both paths coexist (same Git &#8594; ArgoCD)</text>
+
+  <rect x="320" y="44" width="200" height="38" rx="8" class="p"/>
+  <text x="420" y="63" text-anchor="middle" font-size="12.5" font-weight="700">Git &#183; tenant.yaml</text>
+  <text x="420" y="76" text-anchor="middle" font-size="10" class="sub">source of truth</text>
+  <rect x="320" y="98" width="200" height="40" rx="8" class="p"/>
+  <text x="420" y="117" text-anchor="middle" font-size="12.5" font-weight="700">ArgoCD (per host cluster)</text>
+  <text x="420" y="130" text-anchor="middle" font-size="10" class="sub">declarative delivery</text>
+  <line x1="420" y1="82" x2="420" y2="98" marker-end="url(#ar)"/>
+
+  <rect x="556" y="98" width="262" height="40" rx="8" fill="none" class="il" stroke-dasharray="3 2.5"/>
+  <text x="687" y="114" text-anchor="middle" font-size="10.5" font-weight="700" class="info">ArgoCD installs Crossplane</text>
+  <text x="687" y="128" text-anchor="middle" font-size="10" class="sub">as a platform add-on (platform/addons)</text>
+  <line x1="520" y1="118" x2="556" y2="118" marker-end="url(#ar)"/>
+
+  <text x="50" y="172" font-size="12.5" font-weight="700">HELM PATH — tenant-a / b / c (what you have)</text>
+  <rect x="50" y="182" width="330" height="42" rx="8" class="b"/>
+  <text x="62" y="200" font-size="11.5" font-weight="700">Helm Application (wl-tenant-X)</text>
+  <text x="62" y="215" font-size="10.5" class="sub">Argo installs charts/tenant directly</text>
+  <rect x="50" y="238" width="330" height="42" rx="8" class="b"/>
+  <text x="62" y="256" font-size="11.5" font-weight="700">charts/tenant (Helm templates)</text>
+  <text x="62" y="271" font-size="10.5" class="sub">the "tenant definition" lives here</text>
+  <rect x="50" y="294" width="330" height="92" rx="8" class="p"/>
+  <text x="62" y="313" font-size="11.5" font-weight="700">vCluster tenant-X</text>
+  <text x="62" y="332" font-size="10.5" class="sub">ns &#183; ResourceQuota &#183; LimitRange &#183; NetPol</text>
+  <text x="62" y="349" font-size="10.5" class="sub">Secret &#183; PostgreSQL &#183; api &#183; web</text>
+  <text x="62" y="366" font-size="10.5" class="sub">Gateway + TLS</text>
+  <line x1="320" y1="138" x2="215" y2="182" marker-end="url(#ar)"/>
+  <line x1="215" y1="224" x2="215" y2="238" marker-end="url(#ar)"/>
+  <line x1="215" y1="280" x2="215" y2="294" marker-end="url(#ar)"/>
+
+  <text x="460" y="172" font-size="12.5" font-weight="700" class="info">CROSSPLANE v2 PATH — tenant-d (no Claim)</text>
+  <rect x="460" y="182" width="330" height="42" rx="8" class="b il"/>
+  <text x="472" y="200" font-size="11.5" font-weight="700">GPUTenant XR &#183; namespaced (v2)</text>
+  <text x="472" y="215" font-size="10.5" class="sub">v2 has NO Claim &#8212; the XR IS the request</text>
+  <rect x="460" y="238" width="330" height="42" rx="8" class="b il"/>
+  <text x="472" y="256" font-size="11.5" font-weight="700">Composition (XRD apiextensions/v2)</text>
+  <text x="472" y="271" font-size="10.5" class="sub">pipeline + function-patch-and-transform</text>
+  <rect x="460" y="294" width="330" height="44" rx="8" class="b il"/>
+  <text x="472" y="312" font-size="11.5" font-weight="700">provider-helm &#8594; SAME chart &#183; OR compose direct</text>
+  <text x="472" y="327" font-size="10.5" class="sub">v2 composes any k8s obj &#183; + cloud DB/bucket/DNS</text>
+  <rect x="460" y="352" width="330" height="34" rx="8" class="p"/>
+  <text x="625" y="373" text-anchor="middle" font-size="10.5" class="sub">same vCluster + resources (reconciled by Crossplane)</text>
+  <line x1="520" y1="138" x2="625" y2="182" marker-end="url(#ar)"/>
+  <line x1="625" y1="224" x2="625" y2="238" marker-end="url(#ar)"/>
+  <line x1="625" y1="280" x2="625" y2="294" marker-end="url(#ar)"/>
+  <line x1="625" y1="338" x2="625" y2="352" marker-end="url(#ar)"/>
+  <line x1="687" y1="138" x2="640" y2="238" class="il" stroke-dasharray="3 2.5" marker-end="url(#ar)"/>
+
+  <rect x="50" y="408" width="740" height="78" rx="9" class="n il" stroke-width="1.3"/>
+  <text x="64" y="430" font-size="12" font-weight="700" class="info">The key (v2): the namespaced XR IS the request — no Claim, no provider-kubernetes shim.</text>
+  <text x="64" y="450" font-size="11">You gain: typed API (validated CRD) + per-RESOURCE reconciliation (not "apply once") + compose NON-k8s infra alongside.</text>
+  <text x="64" y="469" font-size="11">They coexist: a/b/c via Helm, d via Crossplane — same Git &#8594; ArgoCD. You don't change the existing script.</text>
+
+  <text x="50" y="512" font-size="11.5" font-weight="700">What replaces what (and what v2 changed):</text>
+  <text x="60" y="531" font-size="11" class="sub">&#8226; charts/tenant templates &#8594; Composition (provider-helm reuses the chart, OR v2 composes the k8s objects directly)</text>
+  <text x="60" y="549" font-size="11" class="sub">&#8226; v1 Claim (namespaced) + XR (cluster) &#8594; v2 single NAMESPACED XR (claims removed)</text>
+  <text x="60" y="567" font-size="11" class="sub">&#8226; native patch&amp;transform (removed in v2) &#8594; function pipeline (function-patch-and-transform)</text>
+  <text x="60" y="585" font-size="11" class="sub">&#8226; (nothing for cloud infra) &#8594; the Composition composes a managed DB &#183; bucket &#183; DNS &#183; billing</text>
+</svg>
