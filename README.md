@@ -15,12 +15,12 @@ Use these links to navigate directly to the code implementing each component of 
 ### 1. Tenant Workloads & Configurations
 *   **GitOps Tenants Source of Truth**: [`tenants/dev/tenant-a.yaml`](./tenants/dev/tenant-a.yaml) (declares tenant specification, application versions, domain, and secret backend).
 *   **Workload Helm Chart**: [`charts/tenant/`](./charts/tenant/) (the primary golden-path chart containing workloads and governance policies):
-    *   [`apps-deployment.yaml`](./charts/tenant/templates/apps-deployment.yaml) — deploys `customer-api` (using `go-httpbin`) and `customer-web` (using `nginx`).
+    *   [`customer-api.yaml`](./charts/tenant/templates/customer-api.yaml) / [`customer-web.yaml`](./charts/tenant/templates/customer-web.yaml) — deploy `customer-api` (`go-httpbin`) and `customer-web` (`nginx`).
     *   [`postgres.yaml`](./charts/tenant/templates/postgres.yaml) — deploys the dedicated PostgreSQL StatefulSet and Service.
     *   [`secret.yaml`](./charts/tenant/templates/secret.yaml) — holds the auto-generated database credentials (Helm `lookup` or External Secrets templates).
-    *   [`quota.yaml`](./charts/tenant/templates/quota.yaml) — defines the tenant's ResourceQuota limits.
-    *   [`limitrange.yaml`](./charts/tenant/templates/limitrange.yaml) — defines the default container requests/limits.
+    *   [`namespace.yaml`](./charts/tenant/templates/namespace.yaml) · [`resourcequota.yaml`](./charts/tenant/templates/resourcequota.yaml) · [`limitrange.yaml`](./charts/tenant/templates/limitrange.yaml) — the tenant namespace plus its resource governance (quota + default container requests/limits).
     *   [`networkpolicy.yaml`](./charts/tenant/templates/networkpolicy.yaml) — enforces tenant network isolation using `CiliumNetworkPolicy`.
+*   **Route Helm Chart**: [`charts/tenant-route/`](./charts/tenant-route/) (north-south access deployed on the host: [`gateway.yaml`](./charts/tenant-route/templates/gateway.yaml) + [`httproutes.yaml`](./charts/tenant-route/templates/httproutes.yaml) + TLS).
 
 ### 2. GitOps & Platform Generators
 *   **ApplicationSets (ArgoCD)**: [`applicationsets/`](./applicationsets/) (controllers generating resources based on git configurations):
@@ -35,14 +35,23 @@ Use these links to navigate directly to the code implementing each component of 
 *   **ArgoCD vCluster Auto-Join**: [`platform/vcluster-register`](./platform/vcluster-register/vcluster-register.yaml) — a declarative CronJob (on Root and every regional host) that auto-registers each tenant vCluster as an ArgoCD target so workloads deploy inside it with **no manual step**; [`cli/register-vcluster`](./cli/register-vcluster) is the manual-override equivalent.
 *   **E2E Validation Catalog**: [`cli/validate`](./cli/validate) (automates the 27 functional checks verifying every platform requirement).
 *   **Multicluster Query Tool**: [`cli/fleet-test`](./cli/fleet-test) (routes kubectl queries to nested VM host clusters).
+*   **Platform Showcase** (read-only): [`cli/showcase-platform`](./cli/showcase-platform) (narrated tour of the whole architecture — KubeVirt, Crossplane, CAPI, ArgoCD, vCluster isolation, Gateway/TLS).
+*   **Topology Showcase** (read-only): [`cli/showcase-topology`](./cli/showcase-topology) (demonstrates the cluster-topology & vCluster placement models, including the recursion).
+*   **Fleet Showcase** (read-only): [`cli/showcase-fleet`](./cli/showcase-fleet) (walkthrough of inspecting the created host clusters via `cli/fleet-test`).
 
 ### 4. Advanced Fleet & Infrastructure Definitions
-*   **Cluster API (CAPI) VM Host Clusters**: [`clusters/homelab/`](./clusters/homelab/) (defines the CAPK/KubeVirt virtual machine host clusters: `host-euw1.yaml` regional, `host-mgmt.yaml` management).
-*   **Crossplane v2 Composition & XRD**: [`fleet/config/`](./fleet/config/) (defines infrastructure composition layers):
-    *   [`crossplane-xrd.yaml`](./fleet/config/crossplane-xrd.yaml) — defines the custom `HostCluster` resource API.
-    *   [`crossplane-composition.yaml`](./fleet/config/crossplane-composition.yaml) — implements the composition pipeline matching XRD to CAPI virtual machines.
-*   **KubeVirt & CDI Add-ons**: [`fleet/kubevirt/`](./fleet/kubevirt/) (deploys VM controllers and storage utilities on the bare-metal management node).
-*   **Regional GitOps Base**: [`clusters/regions/`](./clusters/regions/) (parameterized regional root applications and tenants for multi-region configurations, like `eu-west1`).
+*   **Cluster API (CAPI) VM Host Clusters**: [`clusters/homelab/`](./clusters/homelab/) — the CAPK/KubeVirt VM host clusters ([`host-euw1.yaml`](./clusters/homelab/host-euw1.yaml) regional, [`host-mgmt.yaml`](./clusters/homelab/host-mgmt.yaml) management) plus [`machinehealthchecks.yaml`](./clusters/homelab/machinehealthchecks.yaml) (worker auto-remediation).
+*   **Crossplane v2 Composition & XRD**: [`fleet/config/`](./fleet/config/) — the infrastructure composition layer:
+    *   [`crossplane-xrd.yaml`](./fleet/config/crossplane-xrd.yaml) — the custom `HostCluster` resource API.
+    *   [`crossplane-composition.yaml`](./fleet/config/crossplane-composition.yaml) — the pipeline that composes a `HostCluster` into the CAPI/CAPK object tree.
+    *   [`capi-providers.yaml`](./fleet/config/capi-providers.yaml) · [`storageclass-vm.yaml`](./fleet/config/storageclass-vm.yaml) — the CAPI providers and the Longhorn StorageClass backing VM disks.
+*   **Virtualization & HCI storage**: [`fleet/kubevirt/`](./fleet/kubevirt/) (KubeVirt VM controller) and [`fleet/cdi/`](./fleet/cdi/) (CDI — imports the cloud image into a replicated Longhorn PVC per VM disk).
+*   **Platform bootstrap (app-of-apps)**: [`platform/root-app.yaml`](./platform/root-app.yaml) + [`platform/addons/`](./platform/addons/) — each cluster's ArgoCD self-installs the platform services from here (CAPI operator, Crossplane, KubeVirt/CDI, provider-kubernetes, the `fleet-*` ApplicationSets, the tenant ApplicationSets, and `vcluster-register`).
+*   **CNI bootstrap (egg-and-chicken)**: [`clusters/cni/`](./clusters/cni/) — a `ClusterResourceSet` seeds the CNI into each freshly-created cluster, with per-cluster variants ([`calico-vxlan.yaml`](./clusters/cni/calico-vxlan.yaml), [`calico.yaml`](./clusters/cni/calico.yaml), [`cilium.yaml`](./clusters/cni/cilium.yaml)).
+*   **Recursion (management-of-managements)**: [`clusters/management/`](./clusters/management/) — a `management` cluster receives ArgoCD + a region-root via CAAPH/CRS (`helmchartproxy-*.yaml`, `region-root-*.yaml`) and itself CREATES a child workload cluster (`mgmt-child-*.yaml`) on the Root's KubeVirt.
+*   **Regional GitOps Base**: [`clusters/regions/`](./clusters/regions/) — parameterized regional root + tenants for multi-region; the shared body lives in [`_base/`](./clusters/regions/_base/) (token `REGION`), instantiated per region like `eu-west1`.
+*   **vCluster isolation models**: [`vcluster/`](./vcluster/) — the per-tenant control-plane definitions ([`shared-nodes.yaml`](./vcluster/shared-nodes.yaml) default, [`private-nodes.yaml`](./vcluster/private-nodes.yaml)); the isolation knob from §3.1.
+*   **Production reference (paper)**: [`clusters/prod/eu-west-host.yaml`](./clusters/prod/eu-west-host.yaml) — how a host would be defined in production (RKE2 + CIS hardening); a reference, not running in the homelab.
 
 ---
 
@@ -50,25 +59,25 @@ Use these links to navigate directly to the code implementing each component of 
 
 The platform is built from well-known CNCF building blocks. This table is the at-a-glance map: **what
 each component is, the exact role it plays here, where it lives in the repo, and which requirement /
-Design Question (DQ) it answers.** Read top-to-bottom it is the full request flow: a CLI commit → ArgoCD
+Design Question (Q) it answers.** Read top-to-bottom it is the full request flow: a CLI commit → ArgoCD
 reconciles → Crossplane/CAPI build the host cluster → ArgoCD inside it builds the tenant.
 
 | Component | What it is | How I apply it in this platform | Where in the repo | Answers |
 |---|---|---|---|---|
-| **`platform` CLI** | Tenant lifecycle facade | `platform <tenant> create\|delete\|status` does **not** deploy imperatively — it writes & commits `tenants/<env>/<tenant>.yaml` (the source of truth) and lets GitOps reconcile. Idempotent, drift-aware "for free". | [`cli/platform`](./cli/platform) | Req 2, 9, 10, 11; DQ7 |
-| **ArgoCD** | GitOps engine | **Central** ArgoCD runs an app-of-apps (`platform-root`) + 4 ApplicationSets; **each regional cluster runs its OWN ArgoCD** (decentralized → no control-plane SPOF). | [`platform/`](./platform/) | DQ1, DQ3; Req 9–11 |
-| **ApplicationSet** | Templated app generator | Git generators read each tenant file and materialize **one vCluster + one workload (+route +ESO) per tenant** automatically. | [`applicationsets/`](./applicationsets/) | DQ2, DQ3 |
+| **`platform` CLI** | Tenant lifecycle facade | `platform <tenant> create\|delete\|status` does **not** deploy imperatively — it writes & commits `tenants/<env>/<tenant>.yaml` (the source of truth) and lets GitOps reconcile. Idempotent, drift-aware "for free". | [`cli/platform`](./cli/platform) | Req 2, 9, 10, 11; Q7 |
+| **ArgoCD** | GitOps engine | **Central** ArgoCD runs an app-of-apps (`platform-root`) + 4 ApplicationSets; **each regional cluster runs its OWN ArgoCD** (decentralized → no control-plane SPOF). | [`platform/`](./platform/) | Q1, Q3; Req 9–11 |
+| **ApplicationSet** | Templated app generator | Git generators read each tenant file and materialize **one vCluster + one workload (+route +ESO) per tenant** automatically. | [`applicationsets/`](./applicationsets/) | Q2, Q3 |
 | **Helm charts** | Packaging / golden path | `charts/tenant` = the whole tenant unit (namespace, ResourceQuota, LimitRange, CiliumNetworkPolicy, Secret, PostgreSQL, api, web). `charts/tenant-route` = Gateway + HTTPRoute + TLS. Onboarding an app = values, not platform changes. | [`charts/`](./charts/) | Req 3, 4, 5, 6; Infra-def |
-| **vCluster** | Per-tenant control plane | Each tenant gets an isolated virtual API server + etcd (shared-nodes by default) → no CRD/RBAC collisions; the isolation knob (spectrum from shared → dedicated → separate clusters). | [`vcluster/`](./vcluster/) | Req 1, 3; DQ6 |
-| **Crossplane v2** | Infra composition | A custom **`HostCluster` XR** (our own platform API) is composed into the CAPI object tree (each wrapped in a provider-kubernetes `Object` to hand ownership to CAPI). | [`fleet/config/`](./fleet/config/) | DQ1 |
-| **Cluster API + CAPK** | Cluster lifecycle | Turn a one-file `HostCluster` request into a **real Kubernetes cluster whose nodes are KubeVirt VMs**; declarative create/upgrade/delete of the fleet. | [`clusters/homelab/`](./clusters/homelab/), [`fleet/`](./fleet/) | DQ1 |
-| **KubeVirt + CDI** | Virtualization / storage | Runs guest-cluster nodes as VMs on the bare-metal node; CDI DataVolumes back the VM disks on Longhorn (HCI). | [`fleet/kubevirt/`](./fleet/kubevirt/) | DQ1 |
-| **ClusterResourceSet** | Bootstrap injector | Seeds the **CNI** and the **`region-root`** app into each freshly-created cluster (egg-and-chicken bootstrap). | [`clusters/cni/`](./clusters/cni/), [`clusters/management/`](./clusters/management/) | DQ1, DQ3 |
-| **CAAPH (HelmChartProxy)** | Addon delivery | Installs ArgoCD **into** every `role=management` cluster (too big for a CRS ConfigMap). | [`clusters/management/`](./clusters/management/) | DQ1, DQ3 |
-| **Cilium** | CNI + Gateway + policy | Host dataplane, `GatewayClass` for north-south access, and **default-deny `CiliumNetworkPolicy`** for cross-tenant isolation. | [`charts/tenant/templates/networkpolicy.yaml`](./charts/tenant/templates/networkpolicy.yaml) | Req 7, 12; DQ5, DQ6 |
-| **cert-manager** | TLS automation | Issues the Gateway TLS certificates (gateway-shim). | [`applicationsets/routes-appset.yaml`](./applicationsets/routes-appset.yaml) | Req 12; DQ5 |
-| **External Secrets (ESO)** | Secrets (opt-in) | Per-tenant in-cluster secret generation without storing material in Git (default is Helm-generated). | [`applicationsets/eso-appset.yaml`](./applicationsets/eso-appset.yaml) | Req 8; DQ6 |
-| **MachineHealthCheck** | Resilience | CAPI auto-remediates unhealthy worker Machines (declarative alternative to manual recovery). | [`clusters/homelab/machinehealthchecks.yaml`](./clusters/homelab/machinehealthchecks.yaml) | DQ1 (resilience) |
+| **vCluster** | Per-tenant control plane | Each tenant gets an isolated virtual API server + etcd (shared-nodes by default) → no CRD/RBAC collisions; the isolation knob (spectrum from shared → dedicated → separate clusters). | [`vcluster/`](./vcluster/) | Req 1, 3; Q6 |
+| **Crossplane v2** | Infra composition | A custom **`HostCluster` XR** (our own platform API) is composed into the CAPI object tree (each wrapped in a provider-kubernetes `Object` to hand ownership to CAPI). | [`fleet/config/`](./fleet/config/) | Q1 |
+| **Cluster API + CAPK** | Cluster lifecycle | Turn a one-file `HostCluster` request into a **real Kubernetes cluster whose nodes are KubeVirt VMs**; declarative create/upgrade/delete of the fleet. | [`clusters/homelab/`](./clusters/homelab/), [`fleet/`](./fleet/) | Q1 |
+| **KubeVirt + CDI** | Virtualization / storage | Runs guest-cluster nodes as VMs on the bare-metal node; CDI DataVolumes back the VM disks on Longhorn (HCI). | [`fleet/kubevirt/`](./fleet/kubevirt/) | Q1 |
+| **ClusterResourceSet** | Bootstrap injector | Seeds the **CNI** and the **`region-root`** app into each freshly-created cluster (egg-and-chicken bootstrap). | [`clusters/cni/`](./clusters/cni/), [`clusters/management/`](./clusters/management/) | Q1, Q3 |
+| **CAAPH (HelmChartProxy)** | Addon delivery | Installs ArgoCD **into** every `role=management` cluster (too big for a CRS ConfigMap). | [`clusters/management/`](./clusters/management/) | Q1, Q3 |
+| **Cilium** | CNI + Gateway + policy | Host dataplane, `GatewayClass` for north-south access, and **default-deny `CiliumNetworkPolicy`** for cross-tenant isolation. | [`charts/tenant/templates/networkpolicy.yaml`](./charts/tenant/templates/networkpolicy.yaml) | Req 7, 12; Q5, Q6 |
+| **cert-manager** | TLS automation | Issues the Gateway TLS certificates (gateway-shim). | [`applicationsets/routes-appset.yaml`](./applicationsets/routes-appset.yaml) | Req 12; Q5 |
+| **External Secrets (ESO)** | Secrets (opt-in) | Per-tenant in-cluster secret generation without storing material in Git (default is Helm-generated). | [`applicationsets/eso-appset.yaml`](./applicationsets/eso-appset.yaml) | Req 8; Q6 |
+| **MachineHealthCheck** | Resilience | CAPI auto-remediates unhealthy worker Machines (declarative alternative to manual recovery). | [`clusters/homelab/machinehealthchecks.yaml`](./clusters/homelab/machinehealthchecks.yaml) | Q1 (resilience) |
 
 > **One sentence:** the **CLI** commits intent to Git; **ArgoCD** reconciles it; **Crossplane + CAPI +
 > KubeVirt** build the host clusters; **CAAPH + ClusterResourceSet** give each cluster its own ArgoCD;
@@ -845,6 +854,6 @@ Our platform is architected to scale out using a multi-cluster fleet design rath
 | **RBAC** | **R**ole-**B**ased **A**ccess **C**ontrol | Kubernetes authorization (roles + bindings). |
 | **SSA** | **S**erver-**S**ide **A**pply | Field-managed apply; re-applying identical specs is a no-op. |
 | **LGTM** | **L**oki **G**rafana **T**empo **M**imir | The (designed) centralized observability stack. |
-| **DQ** | **D**esign **Q**uestion | One of the **7 questions the requirements ask** to be answered in the README (scaling, app lifecycle, GitOps, version management, external access, security, tenant k8s access) — each answered in §5. *These are what the brief asks.* |
-| **ADR** | **A**rchitecture **D**ecision **R**ecord | A short note of **a design decision we made** + its rationale and trade-off (e.g. decentralized GitOps, Gateway persona split, sync waves). The key ones are listed in §3. *These are what we decided — distinct from the DQs, which are what's asked.* |
+| **Q1–Q7** | **D**esign **Q**uestions | One of the **7 questions the requirements ask** to be answered in the README (scaling, app lifecycle, GitOps, version management, external access, security, tenant k8s access) — each answered in §5. *These are what the brief asks.* |
+| **ADR** | **A**rchitecture **D**ecision **R**ecord | A short note of **a design decision we made** + its rationale and trade-off (e.g. decentralized GitOps, Gateway persona split, sync waves). The key ones are listed in §3. *These are what we decided — distinct from the Design Questions (Q1–Q7), which are what's asked.* |
 
