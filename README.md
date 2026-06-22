@@ -32,7 +32,7 @@ Use these links to navigate directly to the code implementing each component of 
 
 ### 3. CLI Automation & Scripts
 *   **Platform Lifecycle Facade**: [`cli/platform`](./cli/platform) (implements `platform <tenant> <create|delete|status>`).
-*   **ArgoCD vCluster Join**: [`cli/register-vcluster`](./cli/register-vcluster) (automatically registers the vCluster context in ArgoCD).
+*   **ArgoCD vCluster Auto-Join**: [`platform/vcluster-register`](./platform/vcluster-register/vcluster-register.yaml) — a declarative CronJob (on Root and every regional host) that auto-registers each tenant vCluster as an ArgoCD target so workloads deploy inside it with **no manual step**; [`cli/register-vcluster`](./cli/register-vcluster) is the manual-override equivalent.
 *   **E2E Validation Catalog**: [`cli/validate`](./cli/validate) (automates the 27 functional checks verifying every platform requirement).
 *   **Multicluster Query Tool**: [`cli/fleet-test`](./cli/fleet-test) (routes kubectl queries to nested VM host clusters).
 
@@ -94,20 +94,20 @@ This option demonstrates the production-like declarative GitOps workflow. It req
     ```bash
     ./cli/platform tenant-a create --api-version 2.23.1 --web-version 1.27-alpine
     ```
-3.  **Register the vCluster in ArgoCD**:
-    Since the workload is deployed *inside* the virtual cluster, we register the new vCluster control plane context in ArgoCD:
-    ```bash
-    ./cli/register-vcluster vcluster-tenant-a-dev
-    ```
-4.  **Verify the Tenant Status**:
+3.  **Verify the Tenant Status**:
+    The workload runs *inside* the tenant's vCluster, so ArgoCD must have that vCluster registered as a target.
+    This is **automatic**: the `vcluster-register` CronJob (on Root and on every regional host) registers each new
+    vCluster and ArgoCD then deploys the workload into it — no manual step. A tenant is just a Git commit.
+    *(First run: allow a couple of minutes for the vCluster to come up and auto-register. `cli/register-vcluster`
+    remains available as a manual override / one-off bootstrap, but is not required.)*
     ```bash
     ./cli/platform tenant-a status
     ```
-5.  **Run the Validation Tests**:
+4.  **Run the Validation Tests**:
     ```bash
     ./cli/validate tenant-a dev
     ```
-6.  **Delete the Tenant**:
+5.  **Delete the Tenant**:
     ```bash
     ./cli/platform tenant-a delete
     ```
