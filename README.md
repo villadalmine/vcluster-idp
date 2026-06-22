@@ -620,6 +620,12 @@ cluster down at once. That is a real **single point of failure**, and it is wort
 ### Dedicated PostgreSQL (Req 3)
 *   Deployed as a dedicated `StatefulSet` with PVC persistence in [`postgres.yaml`](./charts/tenant/templates/postgres.yaml).
 
+### Application Management (Req 4)
+*   One reusable golden-path chart [`charts/tenant`](./charts/tenant) **is** the whole tenant unit (namespace, quota, policies, secret, Postgres, api, web), so onboarding another app is a **values change, not a platform change**. Per-tenant rendering is generated automatically by the ApplicationSets in [`applicationsets/`](./applicationsets) (one vCluster + workload + route + ESO per tenant file). Clean **platform/app separation**: apps live in [`charts/`](./charts), the platform machinery in [`platform/`](./platform) + [`applicationsets/`](./applicationsets).
+
+### Application Version Management (Req 5)
+*   Versions are selected **per tenant** in `tenants/<env>/<tenant>.yaml` under `applications.api.version` / `applications.web.version`, consumed by the chart as container image tags ([`apps-deployment.yaml`](./charts/tenant/templates/apps-deployment.yaml)). `cli/platform create` can set them; since the version lives in the committed tenant file, upgrades and rollbacks are a Git change ArgoCD reconciles (see also Q4).
+
 ### Resource Governance (Req 6)
 *   **ResourceQuota**: Defined in [`quota.yaml`](./charts/tenant/templates/quota.yaml) using the values `requests.cpu: "2"`, `requests.memory: 4Gi`, `limits.cpu: "4"`, `limits.memory: 8Gi`, and `pods: "20"`.
 *   **LimitRange**: Defined in [`limitrange.yaml`](./charts/tenant/templates/limitrange.yaml) to enforce container-level defaults.
@@ -633,6 +639,10 @@ cluster down at once. That is a real **single point of failure**, and it is wort
 
 ### External Access & TLS (Req 12)
 *   Gateway and HTTPRoute definitions terminate TLS on the host in [`routes-appset.yaml`](./applicationsets/routes-appset.yaml), targeting the virtual services. TLS certs are issued by cert-manager gateway-shim.
+
+### Kubernetes Access (Req 13)
+*   **Applications** — reached over their external domains via the host Gateway/HTTPRoute (`api.<tenant>.<domain>`, `web.<tenant>.<domain>`); see External Access above.
+*   **Tenant Kubernetes environment** — a scoped kubeconfig into the tenant's own vCluster: `vcluster connect <ns> -n <ns>` (or the `vc-<ns>` secret). [`cli/platform`](./cli/platform) `status` and [`cli/fleet-test`](./cli/fleet-test) `vc-info` query the virtual control plane directly, without exposing the host context. Full answer in Q7.
 
 ### Tenant Lifecycle — create / delete / status (Req 2)
 *   `cli/platform <tenant> create|delete|status` is a **GitOps facade**, not an imperative deployer: `create`/`delete` write or remove `tenants/<env>/<tenant>.yaml` (or `clusters/regions/<region>/tenants/...` for a regional tenant) and commit; ArgoCD then reconciles on `create` and **prunes** on `delete`. See [`cli/platform`](./cli/platform).
