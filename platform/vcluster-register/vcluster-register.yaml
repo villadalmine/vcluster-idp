@@ -121,12 +121,17 @@ spec:
                   for s in $(kubectl -n argocd get secret -l platform.idp/managed-by=vcluster-register -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null || true); do
                     kubectl get ns "$s" >/dev/null 2>&1 || { echo "GC: registration secret $s (ns missing) -> deleting"; kubectl -n argocd delete secret "$s" --ignore-not-found 2>/dev/null || true; }
                   done
-                  # 3) wl-apps stuck in Deleting because their destination vCluster no longer exists → remove the finalizer.
-                  for app in $(kubectl -n argocd get applications -l platform.idp/layer=workload -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null || true); do
+                  # 3) ANY tenant app (workload, ESO, ...) stuck in Deleting because its destination vCluster is gone
+                  #    → remove the finalizer. These apps deploy INSIDE the vCluster, so once it (and its registration
+                  #    secret) is gone, ArgoCD's resources-finalizer can never confirm cleanup and hangs forever. We scan
+                  #    ALL apps (NOT just layer=workload — the ESO app has no such label, which left it stuck) and unstick
+                  #    the ones whose NAMED destination cluster is no longer registered (host-targeted apps have no
+                  #    destination.name → skipped). This is what makes `platform <t> delete` converge with no manual step.
+                  for app in $(kubectl -n argocd get applications -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null || true); do
                     [ -n "$(kubectl -n argocd get application "$app" -o jsonpath='{.metadata.deletionTimestamp}' 2>/dev/null || true)" ] || continue
                     dest="$(kubectl -n argocd get application "$app" -o jsonpath='{.spec.destination.name}' 2>/dev/null || true)"
                     if [ -n "$dest" ] && ! kubectl -n argocd get secret "$dest" >/dev/null 2>&1; then
-                      echo "GC: wl-app $app stuck (destination $dest not registered) -> removing finalizer"
+                      echo "GC: app $app stuck (destination $dest not registered) -> removing finalizer"
                       kubectl -n argocd patch application "$app" --type=json -p '[{"op":"remove","path":"/metadata/finalizers"}]' 2>/dev/null || true
                     fi
                   done
