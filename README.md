@@ -709,7 +709,7 @@ cluster down at once. That is a real **single point of failure**, and it is wort
 
 ### Dedicated Namespace & vCluster (Req 1, 3)
 *   The virtual cluster control plane is spawned on the host inside `vcluster-<tenant>-<env>` via [`hosts-appset.yaml`](./applicationsets/hosts-appset.yaml) using the configuration in [`vcluster/shared-nodes.yaml`](./vcluster/shared-nodes.yaml).
-*   Inside the vCluster, a dedicated namespace matching the tenant's name is provisioned by the workload chart [`charts/tenant/templates/apps-deployment.yaml`](./charts/tenant/templates/apps-deployment.yaml).
+*   Inside the vCluster, a dedicated namespace matching the tenant's name is provisioned by the workload chart [`namespace.yaml`](./charts/tenant/templates/namespace.yaml).
 
 ### Dedicated PostgreSQL (Req 3)
 *   Deployed as a dedicated `StatefulSet` with PVC persistence in [`postgres.yaml`](./charts/tenant/templates/postgres.yaml).
@@ -718,10 +718,10 @@ cluster down at once. That is a real **single point of failure**, and it is wort
 *   One reusable golden-path chart [`charts/tenant`](./charts/tenant) **is** the whole tenant unit (namespace, quota, policies, secret, Postgres, api, web), so onboarding another app is a **values change, not a platform change**. Per-tenant rendering is generated automatically by the ApplicationSets in [`applicationsets/`](./applicationsets) (one vCluster + workload + route + ESO per tenant file). Clean **platform/app separation**: apps live in [`charts/`](./charts), the platform machinery in [`platform/`](./platform) + [`applicationsets/`](./applicationsets).
 
 ### Application Version Management (Req 5)
-*   Versions are selected **per tenant** in `tenants/<env>/<tenant>.yaml` under `applications.api.version` / `applications.web.version`, consumed by the chart as container image tags ([`apps-deployment.yaml`](./charts/tenant/templates/apps-deployment.yaml)). `cli/platform create` can set them; since the version lives in the committed tenant file, upgrades and rollbacks are a Git change ArgoCD reconciles (see also Q4).
+*   Versions are selected **per tenant** in `tenants/<env>/<tenant>.yaml` under `applications.api.version` / `applications.web.version`, consumed by the chart as container image tags ([`customer-api.yaml`](./charts/tenant/templates/customer-api.yaml) / [`customer-web.yaml`](./charts/tenant/templates/customer-web.yaml)). `cli/platform create` can set them; since the version lives in the committed tenant file, upgrades and rollbacks are a Git change ArgoCD reconciles (see also Q4).
 
 ### Resource Governance (Req 6)
-*   **ResourceQuota**: Defined in [`quota.yaml`](./charts/tenant/templates/quota.yaml) using the values `requests.cpu: "2"`, `requests.memory: 4Gi`, `limits.cpu: "4"`, `limits.memory: 8Gi`, and `pods: "20"`.
+*   **ResourceQuota**: Defined in [`resourcequota.yaml`](./charts/tenant/templates/resourcequota.yaml) using the values `requests.cpu: "2"`, `requests.memory: 4Gi`, `limits.cpu: "4"`, `limits.memory: 8Gi`, and `pods: "20"`.
 *   **LimitRange**: Defined in [`limitrange.yaml`](./charts/tenant/templates/limitrange.yaml) to enforce container-level defaults.
 
 ### Network Isolation (Req 7)
