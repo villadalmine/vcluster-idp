@@ -200,6 +200,92 @@ What each recording shows (one line each):
 If the terminal recording scrolls too quickly, you can expand these sections to read the exact text output:
 
 <details>
+<summary><b>Click to expand the full text output of the <code>Add a Tenant</code> recording (<code>cli/platform create</code>)</b></summary>
+
+```text
+━━ Add a tenant — one command, then GitOps does the rest (hands-off) ━━
+A developer asks for a tenant: no kubectl, no helm — just the CLI facade.
+━━ 1/6  Declare intent (the CLI writes the source of truth to Git) ━━
+▶ Tenant 'tenant-d' (env=dev) → writing source of truth
+✔ tenants/dev/tenant-d.yaml written
+✔ GitOps commit created — ArgoCD will reconcile the ApplicationSets
+▶ forcing ApplicationSets refresh…
+▶ verify with: platform tenant-d status
+━━ 2/6  What it wrote, and the commit it made ━━
+tenant:
+  name: tenant-d
+  environment: dev
+  domain: example.local
+  secretBackend: generated   # generated | eso
+applications:
+  api:
+    version: "2.23.1"
+  web:
+    version: "1.27-alpine"
+e755489 (HEAD -> main) feat(tenant): provision tenant-d in dev
+━━ 3/6  Publish -> ArgoCD reconciles from Git (no imperative apply) ━━
+To https://github.com/villadalmine/vcluster-idp.git
+   e98dbf1..e755489  main -> main
+━━ 4/6  ArgoCD materializes the tenant Apps (vcluster, route, eso, workload) ━━
+NAME                           SYNC STATUS   HEALTH STATUS
+route-tenant-d-dev             OutOfSync     Progressing
+vcluster-tenant-d-dev          OutOfSync     Missing
+━━ 5/6  The vCluster spins up, then AUTO-REGISTERS in ArgoCD (no manual step) ━━
+Waiting for the vCluster pod to be Running...
+vcluster-tenant-d-dev-0   Running
+Waiting for the vcluster-register CronJob to register it (runs every 5 min — fully hands-off)...
+Auto-registered by the vcluster-register CronJob:
+vcluster-tenant-d-dev   vcluster-register
+━━ 6/6  The workload converges INSIDE the vCluster (PostgreSQL + API + Web) ━━
+Waiting for all components to become Ready...
+Tenant: tenant-d
+Namespace: Ready
+vCluster: Ready
+PostgreSQL: Ready
+API Application: Ready
+Web Application: Ready
+Age: 4m
+━━ Done — a tenant is just a Git commit. ArgoCD + the register CronJob did the rest. ━━
+```
+
+</details>
+
+<details>
+<summary><b>Click to expand the full text output of the <code>Delete a Tenant</code> recording (<code>cli/platform delete</code>)</b></summary>
+
+```text
+━━ Delete a tenant — same facade in reverse (GitOps prune + GC reconcile) ━━
+Starting state: tenant-d is up, registered, and serving.
+NAME                           SYNC STATUS   HEALTH STATUS
+eso-tenant-d-dev               Synced        Healthy
+route-tenant-d-dev             Synced        Healthy
+vcluster-tenant-d-dev          Synced        Healthy
+wl-tenant-d-dev                Synced        Healthy
+━━ 1/4  Remove the source of truth from Git ━━
+▶ Tenant 'tenant-d' (env=dev) → deleting
+✔ tenants/dev/tenant-d.yaml removed
+✔ delete commit — Argo will prune the Applications (vcluster + workload)
+namespace "vcluster-tenant-d-dev" deleted
+secret "vcluster-tenant-d-dev" deleted from argocd namespace
+━━ 2/4  Publish -> ArgoCD prunes the tenant Apps ━━
+To https://github.com/villadalmine/vcluster-idp.git
+   e8df84a..5c29730  main -> main
+vcluster/route Apps delete cleanly (host destination). The in-vCluster Apps (eso/workload)
+would otherwise hang on their ArgoCD finalizer against the now-deleted vCluster...
+━━ 3/4  ...so the vcluster-register CronJob's GC reconciles the teardown ━━
+It runs every 5 min; triggering it now instead of waiting for the schedule:
+  reconciling... Apps left: 4   namespace: 1     reconciling... Apps left: 1   namespace: 0     reconciling... Apps left: 0   namespace: 1     reconciling... Apps left: 0   namespace: 0
+━━ 4/4  Clean — no leftover Apps, namespace + registration gone ━━
+  ✔ no tenant-d Apps
+  ✔ vCluster namespace gone (PVC cascaded)
+  ✔ registered clusters back to 7
+━━ Delete is GitOps too: drop the commit, ArgoCD prunes, the GC reconciles the rest. ━━
+```
+
+</details>
+
+
+<details>
 <summary><b>Click to expand the full text output of <code>./cli/showcase-platform</code></b></summary>
 
 ```text
