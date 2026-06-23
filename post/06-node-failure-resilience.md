@@ -1,8 +1,8 @@
-# Post 06 — Node-failure resilience (DRAFT — not published)
+# Post 06 — Node-failure resilience (PUBLISHED)
 
-> **DRAFT for review.** Not on the blog yet. If you approve, I'll make the `docs/` version + add it to the index.
-> Assets it would use: README §3.2 (the real crash story), `clusters/homelab/machinehealthchecks.yaml`.
-> Possible video: a node-failure runbook (force-delete a zombie virt-launcher → MHC recreates the worker).
+> **Published** → `docs/06-node-failure-resilience.md` (live on the blog + index row). No video.
+> Assets used: README §3.2 (the real crash story), `clusters/homelab/machinehealthchecks.yaml`.
+> The EN/ES blocks below are the copy-paste text for LinkedIn/X.
 
 **Tags:** Kubernetes · ClusterAPI · KubeVirt · Resilience · SRE · Homelab
 

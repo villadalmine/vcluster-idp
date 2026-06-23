@@ -8,9 +8,7 @@ a `docs/` page + a row in `docs/index.md`.
 ## ⏳ Pending review (drafts — NOT published)
 Read these, then say which to publish; each approved one gets a `docs/` page (+ video/diagram if needed) and
 an index row.
-- [ ] **post/06** — Node-failure resilience (MachineHealthCheck + the single-node SPOF lesson)
-- [ ] **post/07** — Secrets: generated vs External Secrets Operator (ESO)
-- [ ] **post/08** — North-south access: Gateway API persona split + cert-manager
+- (none queued)
 
 ## ✅ Published
 - **01** — Multi-tenant GPU on bare metal (HAMi) · video `eaoQKFsHhVDQ7qXc` (+ `n2EoxXTNhSslSXsg`)
@@ -18,6 +16,9 @@ an index row.
 - **03** — Recursion (management-of-managements) · video `gYZPWvobOhFDr0Ew`
 - **04** — A tenant is one Git commit (copy-and-run) · Add/Delete videos
 - **05** — A fleet of clusters from one file (CAPI + Crossplane + KubeVirt) · Showcase/Fleet videos
+- **06** — Node-failure resilience (MachineHealthCheck + the single-node SPOF lesson) · no video
+- **07** — Secrets: generated vs External Secrets Operator (ESO) · no video
+- **08** — North-south access: Gateway API persona split + cert-manager · no video
 
 ## 💡 Next ideas
 (none queued — add here as they come)

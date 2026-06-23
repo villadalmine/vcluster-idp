@@ -1,8 +1,9 @@
-# Post 08 — North-south access: Gateway API + cert-manager (DRAFT — not published)
+# Post 08 — North-south access: Gateway API + cert-manager (PUBLISHED)
 
-> **DRAFT for review.** Not on the blog yet. If you approve, I'll make the `docs/` version + add it to the index.
-> Assets it would use: `charts/tenant-route/` (gateway + httproutes + TLS), `applicationsets/routes-appset.yaml`,
-> Cilium GatewayClass. Possible video: curl `https://api.<tenant>.<domain>` → 200, and cross-tenant blocked.
+> **Published** → `docs/08-north-south-gateway-api.md` (live on the blog + index row). No video.
+> Assets used: `charts/tenant-route/` (gateway + httproutes + TLS), `applicationsets/routes-appset.yaml`,
+> Cilium GatewayClass.
+> The EN/ES blocks below are the copy-paste text for LinkedIn/X.
 
 **Tags:** Kubernetes · GatewayAPI · Cilium · cert-manager · NetworkPolicy · PlatformEngineering · Homelab
 

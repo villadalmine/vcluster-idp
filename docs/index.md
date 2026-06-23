@@ -16,6 +16,9 @@ on a homelab. Each post has a live terminal recording (asciinema) and the source
 | **03** | **[Recursion — management-of-managements](./03-recursion-management-of-managements.html)** | A Kubernetes cluster that creates AND serves its own child, which then provisions its own tenants. Cluster API + CAAPH + decentralized ArgoCD. Validated clean-room. | [▶︎](https://asciinema.org/a/gYZPWvobOhFDr0Ew) |
 | **04** | **[A tenant is one Git commit (copy-and-run)](./04-copy-and-run-tenants.html)** | The CLI is a GitOps facade: a tenant = one commit. Auto-register CronJob + GC, idempotent, hands-off. | [▶︎](https://asciinema.org/a/deIAZiSuxuB8RAo6) |
 | **05** | **[A fleet of clusters from one file](./05-fleet-kubevirt.html)** | Whole Kubernetes clusters from one YAML on a single bare-metal box — Crossplane + Cluster API + KubeVirt. | [▶︎](https://asciinema.org/a/lr5tg4GWV8KK5tF6) |
+| **06** | **[Node-failure resilience — what "HA" really means](./06-node-failure-resilience.html)** | A single-node crash took the whole fleet down. Disk persistence ≠ control-plane recovery; `MachineHealthCheck`, re-provision-from-Git, and the real production answer. | — |
+| **07** | **[Per-tenant secrets — generated vs External Secrets](./07-secrets-generated-vs-eso.html)** | How a GitOps platform hands every tenant a DB password without a secret ever touching Git. Generated (Helm) vs ESO, one flag — plus the `ignoreDifferences` gotcha. | — |
+| **08** | **[North-south access to a vCluster — Gateway API](./08-north-south-gateway-api.html)** | How HTTPS reaches an app inside a vCluster. Gateway API persona split, the Service-sync-not-Gateway-sync detail, cert-manager TLS, and default-deny east-west. | — |
 
 <!-- add new rows here as you publish: | 02 | [Title](./02-slug.html) | ... | [▶︎](asciinema-link) | -->
 

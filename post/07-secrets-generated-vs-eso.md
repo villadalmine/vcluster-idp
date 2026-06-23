@@ -1,8 +1,9 @@
-# Post 07 — Per-tenant secrets: generated vs External Secrets (DRAFT — not published)
+# Post 07 — Per-tenant secrets: generated vs External Secrets (PUBLISHED)
 
-> **DRAFT for review.** Not on the blog yet. If you approve, I'll make the `docs/` version + add it to the index.
-> Assets it would use: `charts/tenant/templates/secret.yaml`, `applicationsets/eso-appset.yaml`,
-> the `secretBackend: generated|eso` knob in the tenant file. Possible diagram: the two secret flows.
+> **Published** → `docs/07-secrets-generated-vs-eso.md` (live on the blog + index row). No video.
+> Assets used: `charts/tenant/templates/secret.yaml`, `applicationsets/eso-appset.yaml`,
+> the `secretBackend: generated|eso` knob in the tenant file.
+> The EN/ES blocks below are the copy-paste text for LinkedIn/X.
 
 **Tags:** Kubernetes · Secrets · ExternalSecrets · GitOps · Security · Homelab
 

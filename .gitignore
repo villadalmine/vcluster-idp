@@ -28,3 +28,6 @@ full-read-test.cast
 # GitHub Pages blog (docs/) — DO publish these markdown files
 !docs/*.md
 !docs/**/*.md
+
+# Work/company plan — CONFIDENTIAL, never publish
+plan/
